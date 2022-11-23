@@ -8,7 +8,13 @@ use waves_rust::model::{Address, Amount, AssetId};
 pub struct Subscription {
     subscriber: Address,
     created_at: DateTime<Utc>,
+    mode: SubscriptionMode,
     topic: Topic,
+}
+
+pub enum SubscriptionMode {
+    Once,
+    Repeat,
 }
 
 pub enum Topic {
@@ -19,7 +25,6 @@ pub enum Topic {
     PriceThreshold {
         amount_asset: Option<AssetId>,
         price_threshold: Amount,
-        once: bool,
     },
 }
 
