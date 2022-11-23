@@ -12,6 +12,11 @@ waves-rust = "0.2.0"
 warp = "0.3"
 chrono = { version = "0.4", features = ["serde"] }
 serde_json = "1.0"
+envy = "0.4"
+thiserror = "1.0"
+reqwest = { version = "0.11", features = ["json"] }
+wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
+wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.3" }
 
 [lib]
 name = "app_lib"
