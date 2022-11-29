@@ -18,7 +18,7 @@ pub enum Message {
         price_asset_ticker: String,
         execution_percentage: f64,
     },
-    PriceThresholdPassed {
+    PriceThresholdReached {
         amount_asset_ticker: String,
         price_asset_ticker: String,
         threshold: f64, // decimals already applied
