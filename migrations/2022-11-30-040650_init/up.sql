@@ -5,19 +5,19 @@ CREATE TABLE IF NOT EXISTS subscribers (
 );
 
 CREATE TABLE IF NOT EXISTS devices (
+    uid serial not null primary key,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     fcm_uid varchar NOT NULL,
     subscriber_address varchar NOT NULL,
     language varchar NOT NULL,
-    primary key (subscriber_address, fcm_uid),
     foreign key (subscriber_address) references subscribers(address)
 );
 
 CREATE TABLE IF NOT EXISTS subscriptions (
+    uid serial not null unique,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
-    uid serial not null unique,
     subscriber_address varchar NOT NULL,
     topic varchar NOT NULL,
     topic_type integer not null, -- todo enum instead of integer
@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS topics_price_threshold (
 create index on topics_price_threshold(amount_asset_id, price_asset_id, price_threshold);
 
 CREATE TABLE IF NOT EXISTS messages (
+    uid serial not null primary key,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     subscription_uid integer,
@@ -44,6 +45,5 @@ CREATE TABLE IF NOT EXISTS messages (
     data jsonb not null,
     collapse_key varchar,
     sending_error varchar,
-    primary key (subscription_uid, created_at),
     foreign key (subscription_uid) references subscriptions(uid)
 );
