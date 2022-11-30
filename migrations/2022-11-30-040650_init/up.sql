@@ -7,42 +7,43 @@ CREATE TABLE IF NOT EXISTS subscribers (
 CREATE TABLE IF NOT EXISTS devices (
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
-    fcm_uid varchar NOT NULL primary key,
-    subscriber_address varchar NOT NULL references subscribers(address),
-    language varchar NOT NULL
+    fcm_uid varchar NOT NULL,
+    subscriber_address varchar NOT NULL,
+    language varchar NOT NULL,
+    primary key (subscriber_address, fcm_uid),
+    foreign key (subscriber_address) references subscribers(address)
 );
-
-CREATE TYPE subscription_mode AS ENUM ('Once', 'Repeat');
 
 CREATE TABLE IF NOT EXISTS subscriptions (
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     uid serial not null unique,
-    mode subscription_mode not null,
-    subscriber_address varchar NOT NULL references subscribers(address),
+    subscriber_address varchar NOT NULL,
     topic varchar NOT NULL,
-    primary key (subscriber_address, topic)
+    topic_type integer not null, -- todo enum instead of integer
+    primary key (subscriber_address, topic),
+    foreign key (subscriber_address) references subscribers(address)
 );
 
 -- Topic-specific tables. Fields are indexed and search-optimized.
 CREATE TABLE IF NOT EXISTS topics_price_threshold (
-    subscription_uid integer references subscriptions(uid) primary key,
+    subscription_uid integer primary key,
     amount_asset_id varchar not null,
     price_asset_id varchar not null,
-    price_threshold bigint not null
+    price_threshold bigint not null,
+    foreign key (subscription_uid) references subscriptions(uid)
 );
 create index on topics_price_threshold(amount_asset_id, price_asset_id, price_threshold);
-
 
 CREATE TABLE IF NOT EXISTS messages (
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
-    subscription_uid integer references subscriptions(uid),
-    localized_text varchar not null,
-    -- TODO more fields? See what FCM requires
-    primary key (subscription_uid, created_at)
+    subscription_uid integer,
+    notification_title varchar not null,
+    notification_body varchar not null,
+    data jsonb not null,
+    collapse_key varchar,
+    sending_error varchar,
+    primary key (subscription_uid, created_at),
+    foreign key (subscription_uid) references subscriptions(uid)
 );
-
-
-drop table subscriptions cascade;
-drop table subscribers cascade;
