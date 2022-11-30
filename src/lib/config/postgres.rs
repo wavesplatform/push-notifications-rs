@@ -1,21 +1,17 @@
 use serde::Deserialize;
-use std::fmt::{Debug, Formatter, Result};
+use std::{
+    fmt,
+    fmt::{Debug, Formatter},
+};
+
+use crate::error::Error;
 
 #[derive(Deserialize, Clone)]
 pub struct PostgresConfig {
-    #[serde(rename = "pghost")]
     pub host: String,
-
-    #[serde(rename = "pgport", default = "default_pgport")]
     pub port: u16,
-
-    #[serde(rename = "pgdatabase")]
     pub database: String,
-
-    #[serde(rename = "pguser")]
     pub user: String,
-
-    #[serde(rename = "pgpassword")]
     pub password: String,
 }
 
@@ -24,6 +20,10 @@ fn default_pgport() -> u16 {
 }
 
 impl PostgresConfig {
+    pub fn load() -> Result<Self, Error> {
+        Ok(envy::prefixed("PG").from_env::<PostgresConfig>()?)
+    }
+
     pub fn database_url(&self) -> String {
         format!(
             "postgres://{}:{}@{}:{}/{}",
@@ -33,7 +33,7 @@ impl PostgresConfig {
 }
 
 impl Debug for PostgresConfig {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Intentionally avoid printing password for security reasons
         write!(
             f,

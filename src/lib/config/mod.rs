@@ -1,10 +1,19 @@
 mod postgres;
 
-use serde::Deserialize;
-
 pub use postgres::PostgresConfig;
+
+use crate::error::Error;
+use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]
 pub struct Config {
-    postgres: PostgresConfig,
+    pub postgres: PostgresConfig,
+}
+
+impl Config {
+    pub fn load() -> Result<Self, Error> {
+        Ok(Self {
+            postgres: postgres::PostgresConfig::load()?,
+        })
+    }
 }
