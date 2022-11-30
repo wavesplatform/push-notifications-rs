@@ -17,10 +17,18 @@ thiserror = "1.0"
 reqwest = { version = "0.11", features = ["json"] }
 wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
 wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.3" }
+diesel = { version = "2.0", default-features = false, features = ["postgres", "serde_json", "without-deprecated"] }
+diesel-derive-enum = { version = "2.0.0-rc.0", features = ["postgres"] }
+diesel_migrations = "2.0"
+anyhow = "1.0"
 
 [lib]
-name = "app_lib"
+name = "lib"
 path = "src/lib/lib.rs"
+
+[[bin]]
+name = "migration"
+path = "src/bin/migration.rs"
 
 [[bin]]
 name = "api"
