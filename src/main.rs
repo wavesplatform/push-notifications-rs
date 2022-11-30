@@ -17,6 +17,6 @@ async fn main() -> Result<(), error::Error> {
         .build();
     let repo = repo::lokalise::Repo::new(lokalise_client, config.project_id);
 
-    println!("{}", repo.get("sell", "en").await?);
+    println!("{}", repo.get("priceAlertMessage", "ru").await?);
     Ok(())
 }

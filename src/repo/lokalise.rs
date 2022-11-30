@@ -20,8 +20,10 @@ impl Repo {
         let keys = self
             .lokalise_client
             .create_req_handler::<dto::KeysResponse>(
-                self.lokalise_client
-                    .http_get(format!("projects/{}/keys", self.project_id)),
+                self.lokalise_client.http_get(format!(
+                    "projects/{}/keys?include_translations=1",
+                    self.project_id
+                )),
                 "lokalise::get",
             )
             .execute()
@@ -86,12 +88,12 @@ pub mod dto {
         pub language_iso: String,
         pub translation: String,
         pub modified_by: i64,
-        pub modified_by_emali: String,
+        pub modified_by_email: String,
         pub modified_at: String,
         pub modified_at_timestamp: i64,
         pub is_reviewed: bool,
         pub is_unverified: bool,
         pub reviewed_by: i64,
-        pub task_id: i64,
+        pub task_id: Option<i64>,
     }
 }
