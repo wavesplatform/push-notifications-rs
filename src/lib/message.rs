@@ -28,7 +28,7 @@ pub enum Message {
 pub struct Queue {}
 
 impl Queue {
-    pub async fn enqueue(message: WithTimestamp<Message>) -> Result<(), Error> {
-        todo!("impl")
+    pub async fn enqueue(&self, message: WithTimestamp<Message>) -> Result<(), Error> {
+        todo!("message enqueue impl")
     }
 }

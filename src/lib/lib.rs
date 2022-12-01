@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_variables)]
+#![allow(dead_code, unused_variables, unused_imports)]
 
 #[macro_use]
 extern crate diesel;
@@ -13,6 +13,7 @@ mod fcm;
 mod localization;
 mod message;
 mod model;
+mod processing;
 mod stream;
 mod subscription;
 

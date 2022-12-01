@@ -1,10 +1,12 @@
 use crate::model::{Amount, AssetId};
 
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum OrderType {
     Limit,
     Market,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum OrderSide {
     Buy,
     Sell,
