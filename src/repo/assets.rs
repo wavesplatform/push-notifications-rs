@@ -19,11 +19,11 @@ impl Repo {
         Repo { assets_client }
     }
 
-    pub async fn get_ticker_by_id(&self, asset_id: AssetId) -> Result<Ticker, Error> {
+    pub async fn ticker(&self, asset_id: AssetId) -> Result<Ticker, Error> {
         self.load(asset_id).await
     }
 
-    pub async fn get_decimals_by_id(&self, asset_id: AssetId) -> Result<Decimals, Error> {
+    pub async fn decimals(&self, asset_id: AssetId) -> Result<Decimals, Error> {
         self.load(asset_id).await
     }
 }
