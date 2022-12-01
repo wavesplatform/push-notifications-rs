@@ -20,11 +20,11 @@ impl Repo {
     }
 
     pub async fn ticker(&self, asset_id: AssetId) -> Result<Ticker, Error> {
-        self.load(asset_id).await
+        self.load(asset_id).await.map_err(Error::from)
     }
 
     pub async fn decimals(&self, asset_id: AssetId) -> Result<Decimals, Error> {
-        self.load(asset_id).await
+        self.load(asset_id).await.map_err(Error::from)
     }
 }
 
