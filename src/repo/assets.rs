@@ -30,7 +30,7 @@ impl Repo {
 
 #[async_trait]
 impl CachedLoader<AssetId, Ticker> for Repo {
-    type Cache = UnboundCache<AssetId, Ticker>;
+    type Cache = TimedCache<AssetId, Ticker>;
 
     type Error = Error;
 
@@ -51,13 +51,13 @@ impl CachedLoader<AssetId, Ticker> for Repo {
     }
 
     fn init_cache() -> Self::Cache {
-        UnboundCache::new()
+        TimedCache::with_lifespan(60 * 60 * 24)
     }
 }
 
 #[async_trait]
 impl CachedLoader<AssetId, Decimals> for Repo {
-    type Cache = TimedCache<AssetId, Decimals>;
+    type Cache = UnboundCache<AssetId, Decimals>;
 
     type Error = Error;
 
@@ -78,6 +78,6 @@ impl CachedLoader<AssetId, Decimals> for Repo {
     }
 
     fn init_cache() -> Self::Cache {
-        TimedCache::with_lifespan(60 * 60 * 24)
+        UnboundCache::new()
     }
 }
