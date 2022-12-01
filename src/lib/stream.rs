@@ -12,13 +12,19 @@ pub enum OrderSide {
     Sell,
 }
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum OrderExecution {
+    Full,
+    Partial { percentage: f64 },
+}
+
 pub enum Event {
     OrderExecuted {
         order_type: OrderType,
         side: OrderSide,
         amount_asset_id: AssetId,
         price_asset_id: AssetId,
-        execution_percentage: f64,
+        execution: OrderExecution,
     },
     PriceChanged {
         amount_asset_id: AssetId,

@@ -1,6 +1,6 @@
 use crate::{
     error::Error,
-    stream::{OrderSide, OrderType},
+    stream::{OrderExecution, OrderSide, OrderType},
     timestamp::WithTimestamp,
 };
 
@@ -10,13 +10,7 @@ pub enum Message {
         side: OrderSide,
         amount_asset_ticker: String,
         price_asset_ticker: String,
-    },
-    OrderPartiallyExecuted {
-        order_type: OrderType,
-        side: OrderSide,
-        amount_asset_ticker: String,
-        price_asset_ticker: String,
-        execution_percentage: f64,
+        execution: OrderExecution,
     },
     PriceThresholdReached {
         amount_asset_ticker: String,

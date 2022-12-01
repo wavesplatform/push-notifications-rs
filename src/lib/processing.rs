@@ -2,7 +2,7 @@ use crate::{
     error::Error,
     message::{self, Message},
     model::AsBase58String,
-    stream::Event,
+    stream::{Event, OrderExecution},
     subscription::{self, Subscription, SubscriptionMode, Topic},
     timestamp::WithCurrentTimestamp,
 };
@@ -51,30 +51,16 @@ fn make_message(event: &Event, topic: &Topic) -> Message {
                 side,
                 amount_asset_id,
                 price_asset_id,
-                execution_percentage,
+                execution,
             },
             Topic::OrderFulfilled { .. },
-        ) => {
-            //TODO instead of using f64 field + magic numbers (e.g. 100.0%)
-            // maybe better to use enum Execution { Full, Percentage(f64) }
-            // and also merge messages OrderPartiallyExecuted and OrderExecuted into one?
-            if *execution_percentage < 100.0 {
-                Message::OrderPartiallyExecuted {
-                    order_type: *order_type,
-                    side: *side,
-                    amount_asset_ticker: amount_asset_id.as_base58_string(),
-                    price_asset_ticker: price_asset_id.as_base58_string(),
-                    execution_percentage: *execution_percentage,
-                }
-            } else {
-                Message::OrderExecuted {
-                    order_type: *order_type,
-                    side: *side,
-                    amount_asset_ticker: amount_asset_id.as_base58_string(),
-                    price_asset_ticker: price_asset_id.as_base58_string(),
-                }
-            }
-        }
+        ) => Message::OrderExecuted {
+            order_type: *order_type,
+            side: *side,
+            amount_asset_ticker: amount_asset_id.as_base58_string(),
+            price_asset_ticker: price_asset_id.as_base58_string(),
+            execution: *execution,
+        },
         (
             Event::PriceChanged {
                 amount_asset_id,
