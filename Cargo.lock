@@ -27,12 +27,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "216261ddc8289130e551ddcd5ce8a064710c0d064a4d2895c67151c92b5443f6"
 
 [[package]]
-name = "anymap"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33954243bd79057c2de7338850b85983a44588021f8a5fee574a8888c6de4344"
-
-[[package]]
 name = "arc-swap"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -61,9 +55,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.58"
+version = "0.1.59"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e805d94e6b5001b651426cf4cd446b1ab5f319d27bab5c644f61de0a804360c"
+checksum = "31e6e93155431f3931513b243d371981bb2770112b370c82745a1d19d2f99364"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -213,68 +207,6 @@ name = "bytes"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfb24e866b15a1af2a1b663f10c6b6b8f397a84aadb828f12e5b289ec23a3a3c"
-
-[[package]]
-name = "cached"
-version = "0.26.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2bc2fd249a24a9cdd4276f3a3e0461713271ab63b0e9e656e200e8e21c8c927"
-dependencies = [
- "async-mutex",
- "async-rwlock",
- "async-trait",
- "cached_proc_macro 0.7.1",
- "cached_proc_macro_types",
- "futures",
- "hashbrown 0.11.2",
- "once_cell",
-]
-
-[[package]]
-name = "cached"
-version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af4dfac631a8e77b2f327f7852bb6172771f5279c4512efe79fad6067b37be3d"
-dependencies = [
- "async-mutex",
- "async-rwlock",
- "async-trait",
- "cached_proc_macro 0.9.0",
- "cached_proc_macro_types",
- "futures",
- "hashbrown 0.11.2",
- "once_cell",
-]
-
-[[package]]
-name = "cached_proc_macro"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac3531903b39df48a378a7ed515baee7c1fff32488489c7d0725eb1749b22a91"
-dependencies = [
- "cached_proc_macro_types",
- "darling",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "cached_proc_macro"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "725f434d6da2814b989bd905c62ca28a9383feff7440210dc279665fbbbc9511"
-dependencies = [
- "cached_proc_macro_types",
- "darling",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "cached_proc_macro_types"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a4f925191b4367301851c6d99b09890311d74b0d43f274c0b34c86d308a3663"
 
 [[package]]
 name = "cc"
@@ -483,15 +415,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
 dependencies = [
  "generic-array",
-]
-
-[[package]]
-name = "dataloader"
-version = "0.14.0"
-source = "git+https://github.com/cksac/dataloader-rs?rev=527933#527933928f1be0e7f288df6b0586cf8a83eef885"
-dependencies = [
- "async-trait",
- "tokio",
 ]
 
 [[package]]
@@ -1524,7 +1447,11 @@ dependencies = [
 name = "push-notifications-rs"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
+ "chrono",
+ "diesel",
+ "diesel_migrations",
  "envy",
  "fcm",
  "itertools",
@@ -1533,8 +1460,10 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
- "wavesexchange_apis",
- "wavesexchange_loaders",
+ "warp",
+ "waves-rust",
+ "wavesexchange_log 0.5.1 (git+https://github.com/waves-exchange/wavesexchange-rs?tag=wavesexchange_log/0.5.1)",
+ "wavesexchange_warp",
 ]
 
 [[package]]
@@ -2674,12 +2603,13 @@ dependencies = [
  "base64",
  "blake2",
  "bs58",
- "cached 0.30.0",
- "chrono",
- "futures",
- "itertools",
- "once_cell",
- "percent-encoding",
+ "curve25519-dalek 4.0.0-pre.2",
+ "ed25519-dalek",
+ "hex",
+ "prost",
+ "protobuf-src",
+ "rand 0.8.5",
+ "regex",
  "reqwest",
  "serde_json",
  "sha2 0.10.6",
@@ -2687,52 +2617,9 @@ dependencies = [
  "thiserror",
  "tokio",
  "tonic",
- "waves-protobuf-schemas",
- "wavesexchange_log",
- "wavesexchange_warp",
-]
-
-[[package]]
-name = "wavesexchange_loaders"
-version = "0.2.1"
-source = "git+https://github.com/waves-exchange/wavesexchange-rs?tag=wavesexchange_loaders/0.2.1#fe369b0cfc45d9a6c3e08c17d5c95a590dbbf3ce"
-dependencies = [
- "anymap",
- "async-trait",
- "cached 0.26.2",
- "dataloader",
- "once_cell",
- "thiserror",
-]
-
-[[package]]
-name = "wavesexchange_log"
-version = "0.5.1"
-source = "git+https://github.com/waves-exchange/wavesexchange-rs?tag=wavesexchange_apis/0.1.13#ba2e4b80d38fe87cbc202d2b73855c36876bc513"
-dependencies = [
- "chrono",
- "once_cell",
- "slog",
- "slog-async",
- "slog-envlogger",
- "slog-json",
- "slog-term",
-]
-
-[[package]]
-name = "wavesexchange_warp"
-version = "0.14.3"
-source = "git+https://github.com/waves-exchange/wavesexchange-rs?tag=wavesexchange_apis/0.1.13#ba2e4b80d38fe87cbc202d2b73855c36876bc513"
-dependencies = [
- "futures",
- "lazy_static",
- "once_cell",
- "prometheus",
- "serde",
- "serde_json",
- "serde_qs",
- "warp",
- "wavesexchange_log",
+ "tonic-build",
+ "url",
+ "urlencoding",
 ]
 
 [[package]]
