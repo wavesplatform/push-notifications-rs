@@ -16,12 +16,27 @@ mod model;
 mod stream;
 mod subscription;
 
-use chrono::{DateTime, Utc};
-
 pub use error::Error;
 pub use message::Message;
 
-pub struct WithTimestamp<T> {
-    timestamp: DateTime<Utc>,
-    value: T,
+mod timestamp {
+    use chrono::{DateTime, Utc};
+
+    pub struct WithTimestamp<T> {
+        timestamp: DateTime<Utc>,
+        value: T,
+    }
+
+    pub trait WithCurrentTimestamp<T> {
+        fn with_current_timestamp(self) -> WithTimestamp<T>;
+    }
+
+    impl<T> WithCurrentTimestamp<T> for T {
+        fn with_current_timestamp(self) -> WithTimestamp<T> {
+            WithTimestamp {
+                timestamp: Utc::now(),
+                value: self,
+            }
+        }
+    }
 }

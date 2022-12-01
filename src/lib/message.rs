@@ -1,7 +1,7 @@
 use crate::{
     error::Error,
     stream::{OrderSide, OrderType},
-    WithTimestamp,
+    timestamp::WithTimestamp,
 };
 
 pub enum Message {
