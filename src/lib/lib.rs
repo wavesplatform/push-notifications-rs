@@ -12,6 +12,7 @@ mod error;
 mod fcm;
 mod localization;
 mod message;
+mod model;
 mod stream;
 mod subscription;
 

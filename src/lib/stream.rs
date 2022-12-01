@@ -1,4 +1,4 @@
-use waves_rust::model::{Amount, AssetId};
+use crate::model::{Amount, AssetId};
 
 pub enum OrderType {
     Limit,

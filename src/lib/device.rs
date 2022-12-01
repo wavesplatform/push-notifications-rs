@@ -1,4 +1,4 @@
-use waves_rust::model::Address;
+use crate::model::Address;
 
 pub type FcmUid = String;
 

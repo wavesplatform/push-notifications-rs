@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
-use waves_rust::model::{Address, Amount, AssetId};
 
+use crate::model::{Address, Amount, AssetId};
 use crate::stream::Event;
 
 pub struct Subscription {

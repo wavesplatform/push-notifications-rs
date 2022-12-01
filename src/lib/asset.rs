@@ -1,5 +1,5 @@
 use crate::error::Error;
-use waves_rust::model::AssetId;
+use crate::model::AssetId;
 
 pub struct RemoteGateway {}
 
