@@ -53,33 +53,44 @@ fn make_message(event: &Event, topic: &Topic) -> Message {
                 price_asset_id,
                 execution,
             },
-            Topic::OrderFulfilled { .. },
-        ) => Message::OrderExecuted {
-            order_type: *order_type,
-            side: *side,
-            amount_asset_ticker: amount_asset_id.as_base58_string(),
-            price_asset_ticker: price_asset_id.as_base58_string(),
-            execution: *execution,
-        },
+            Topic::OrderFulfilled {
+                amount_asset,
+                price_asset,
+            },
+        ) => {
+            debug_assert_eq!(amount_asset_id, amount_asset.as_ref().expect("amount"));
+            debug_assert_eq!(price_asset_id, price_asset.as_ref().expect("price"));
+            Message::OrderExecuted {
+                order_type: *order_type,
+                side: *side,
+                amount_asset_ticker: amount_asset_id.as_base58_string(),
+                price_asset_ticker: price_asset_id.as_base58_string(),
+                execution: *execution,
+            }
+        }
         (
             Event::PriceChanged {
                 amount_asset_id,
-                low,
-                high,
+                price_asset_id,
+                current_price,
+                previous_price,
             },
             Topic::PriceThreshold {
-                price_threshold, ..
+                amount_asset,
+                price_threshold,
             },
         ) => {
-            //TODO need a previous event here of the same type and asset to compare,
-            // where to get it in general case? Store in the database?
+            debug_assert_eq!(amount_asset_id, amount_asset.as_ref().expect("amount"));
+            debug_assert_eq!(
+                price_asset_id,
+                price_threshold.asset_id().as_ref().expect("price")
+            );
+            let price_threshold = price_threshold.value() as f64; //TODO need to apply decimals
+            debug_assert!(current_price.has_crossed_threshold(previous_price, price_threshold));
             Message::PriceThresholdReached {
                 amount_asset_ticker: amount_asset_id.as_base58_string(),
-                price_asset_ticker: price_threshold
-                    .asset_id()
-                    .expect("price_asset_id")
-                    .as_base58_string(),
-                threshold: price_threshold.value() as f64, //TODO need to apply decimals here
+                price_asset_ticker: price_asset_id.as_base58_string(),
+                threshold: price_threshold,
             }
         }
         (_, _) => unreachable!("unrecognized combination of subscription and event"),
