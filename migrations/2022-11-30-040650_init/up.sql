@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS devices (
     language varchar NOT NULL,
     foreign key (subscriber_address) references subscribers(address)
 );
+create index on devices(subscriber_address);
 
 CREATE TABLE IF NOT EXISTS subscriptions (
     uid serial not null unique,
@@ -44,6 +45,17 @@ CREATE TABLE IF NOT EXISTS messages (
     notification_body varchar not null,
     data jsonb,
     collapse_key varchar,
-    sending_error varchar, -- todo move to separate tables to support miltiple devices and retries
     foreign key (subscription_uid) references subscriptions(uid)
 );
+create index on messages(subscription_uid);
+
+CREATE TABLE IF NOT EXISTS failed_send_attempts (
+    attempted_at timestamptz not null default now(),
+    message_uid integer not null,
+    device_uid integer not null,
+    error_reason varchar not null,
+    primary key (message_uid, attempted_at, device_uid),
+    foreign key (message_uid) references messages(uid),
+    foreign key (device_uid) references devices(uid),
+);
+create index on failed_send_attempts(device_uid);
