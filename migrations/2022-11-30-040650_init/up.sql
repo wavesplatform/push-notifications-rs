@@ -44,6 +44,6 @@ CREATE TABLE IF NOT EXISTS messages (
     notification_body varchar not null,
     data jsonb not null,
     collapse_key varchar,
-    sending_error varchar,
+    sending_error varchar, -- todo move to separate tables to support miltiple devices and retries
     foreign key (subscription_uid) references subscriptions(uid)
 );
