@@ -13,7 +13,7 @@ impl Config {
     pub fn load() -> Result<Self, Error> {
         Ok(Self {
             postgres: postgres::Config::load()?,
-            fcm_api_key: std::env::var("FCM_API_KEY").unwrap_or_default(),
+            fcm_api_key: std::env::var("FCM_API_KEY").unwrap_or_default(), // todo make required
         })
     }
 }
