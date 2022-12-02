@@ -39,7 +39,6 @@ create index on topics_price_threshold(amount_asset_id, price_asset_id, price_th
 CREATE TABLE IF NOT EXISTS messages (
     uid serial not null primary key,
     created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now(),
     subscription_uid integer not null,
     notification_title varchar not null,
     notification_body varchar not null,
@@ -56,6 +55,6 @@ CREATE TABLE IF NOT EXISTS failed_send_attempts (
     error_reason varchar not null,
     primary key (message_uid, attempted_at, device_uid),
     foreign key (message_uid) references messages(uid),
-    foreign key (device_uid) references devices(uid),
+    foreign key (device_uid) references devices(uid)
 );
 create index on failed_send_attempts(device_uid);

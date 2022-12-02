@@ -12,16 +12,23 @@ diesel::table! {
 }
 
 diesel::table! {
+    failed_send_attempts (message_uid, attempted_at, device_uid) {
+        attempted_at -> Timestamptz,
+        message_uid -> Int4,
+        device_uid -> Int4,
+        error_reason -> Varchar,
+    }
+}
+
+diesel::table! {
     messages (uid) {
         uid -> Int4,
         created_at -> Timestamptz,
-        updated_at -> Timestamptz,
         subscription_uid -> Int4,
         notification_title -> Varchar,
         notification_body -> Varchar,
         data -> Nullable<Jsonb>,
         collapse_key -> Nullable<Varchar>,
-        sending_error -> Nullable<Varchar>,
     }
 }
 
@@ -54,10 +61,13 @@ diesel::table! {
 }
 
 diesel::joinable!(devices -> subscribers (subscriber_address));
+diesel::joinable!(failed_send_attempts -> devices (device_uid));
+diesel::joinable!(failed_send_attempts -> messages (message_uid));
 diesel::joinable!(subscriptions -> subscribers (subscriber_address));
 
 diesel::allow_tables_to_appear_in_same_query!(
     devices,
+    failed_send_attempts,
     messages,
     subscribers,
     subscriptions,
