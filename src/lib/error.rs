@@ -24,7 +24,7 @@ pub enum Error {
     #[error("DbQueryError: {0}")]
     DbQueryError(#[from] diesel::result::Error),
 
-    #[error("TranlationError: {0}")]
+    #[error("TranslationError: {0}")]
     TranslationError(String),
 
     #[error("UpstreamApiRequestError: {0}")]
