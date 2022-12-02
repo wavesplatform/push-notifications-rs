@@ -1,7 +1,7 @@
 use crate::{error::Error, WithTimestamp};
 use std::collections::HashMap;
 
-#[derive(Queryable)]
+#[derive(Debug, Clone, Queryable)]
 pub struct Message {
     notification_title: String,
     notification_body: String,
