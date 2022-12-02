@@ -1,21 +1,34 @@
-use crate::{error::Error, WithTimestamp};
-use std::collections::HashMap;
+use crate::{
+    error::Error,
+    stream::{OrderSide, OrderType},
+    WithTimestamp,
+};
 
-#[derive(Debug, Clone, Queryable)]
-pub struct Message {
-    pub notification_title: String,
-    pub notification_body: String,
-    pub data: HashMap<String, String>, // todo arbitrary JSON
-    pub collapse_key: Option<String>,
+pub enum Message {
+    OrderExecuted {
+        order_type: OrderType,
+        side: OrderSide,
+        amount_asset_ticker: String,
+        price_asset_ticker: String,
+    },
+    OrderPartiallyExecuted {
+        order_type: OrderType,
+        side: OrderSide,
+        amount_asset_ticker: String,
+        price_asset_ticker: String,
+        execution_percentage: f64,
+    },
+    PriceThresholdReached {
+        amount_asset_ticker: String,
+        price_asset_ticker: String,
+        threshold: f64, // decimals already applied
+    },
 }
 
 pub struct Queue {}
 
 impl Queue {
-    pub async fn enqueue(
-        subscription_uid: i32,
-        message: WithTimestamp<Message>,
-    ) -> Result<(), Error> {
+    pub async fn enqueue(message: WithTimestamp<Message>) -> Result<(), Error> {
         todo!("impl")
     }
 }
