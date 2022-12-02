@@ -10,6 +10,12 @@ pub enum Error {
     HttpRequestError(Arc<reqwest::Error>),
     #[error("SerdeJsonError: {0}")]
     SerdeJsonError(#[from] serde_json::Error),
+    #[error("FcmUpstreamError: {0}")]
+    FcmUpstreamError(#[from] fcm::FcmError),
+    #[error("DbConnectionError: {0}")]
+    DbConnectionError(#[from] diesel::result::ConnectionError),
+    #[error("DbQueryError: {0}")]
+    DbQueryError(#[from] diesel::result::Error),
 }
 
 impl From<reqwest::Error> for Error {

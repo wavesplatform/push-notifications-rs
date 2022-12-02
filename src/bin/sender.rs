@@ -1,28 +1,29 @@
-use diesel::{debug_query, prelude::*, query_dsl::InternalJoinDsl, Connection, PgConnection};
-use fcm::Message;
+use diesel::{prelude::*, Connection, PgConnection};
 use lib::{
-    config::PostgresConfig,
+    config::Config,
     schema::{devices, messages, subscriptions},
+    Error,
 };
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
 
 type UID = i32;
-
-const FCM_API_KEY_TEMP: &str = "key-0";
+// todo proper logging
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let dbconfig = PostgresConfig::load()?;
-    let mut conn = PgConnection::establish(&dbconfig.database_url())?;
+async fn main() -> Result<(), Error> {
+    let config = Config::load()?;
+    let mut conn = PgConnection::establish(&config.postgres.database_url())?;
 
     // get oldest message
-    let (subscription_uid, notification_title, notification_body, _collapse_key): (
+    let (message_uid, subscription_uid, notification_title, notification_body, _collapse_key): (
+        UID,
         UID,
         String,
         String,
         Option<String>,
     ) = messages::table
         .select((
+            messages::uid,
             messages::subscription_uid,
             messages::notification_title,
             messages::notification_body,
@@ -30,9 +31,7 @@ async fn main() -> anyhow::Result<()> {
         ))
         .filter(messages::sending_error.is_null())
         .order(messages::updated_at.asc())
-        .first(&mut conn)?;
-
-    // let client = fcm::Client::new();
+        .first(&mut conn)?; // todo handle Error: Record not found
 
     // get recipient `fcm_uid` from message `subscription_uid`
     // todo multiple devices support
@@ -53,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let message = {
-        let mut builder = fcm::MessageBuilder::new(FCM_API_KEY_TEMP, &recipient_fcm_uid);
+        let mut builder = fcm::MessageBuilder::new(&config.fcm_api_key, &recipient_fcm_uid);
         builder.notification(notification);
         builder.data(&HashMap::<String, String>::new())?; // message must have `data` field, or empty object as minimum
 
@@ -68,18 +67,19 @@ async fn main() -> anyhow::Result<()> {
         builder.finalize()
     };
 
-    // todo post-send action
-    match send_to_fcm(message).await {
-        Ok(()) => println!("Send succesful; TODO delete"),
+    // todo post-send actions
+    // match fcm::Client::new().send(message).await.map(|_| ()) {
+    match Ok::<_, fcm::FcmError>(message).map(|_| ()) {
+        Ok(()) => {
+            println!("Send succesful message UID {}", message_uid);
+
+            diesel::delete(messages::table.filter(messages::uid.eq(message_uid)))
+                .execute(&mut conn)?;
+
+            println!("Message {} deleted from DB", message_uid);
+        }
         Err(err) => eprintln!("Send error: {:?}. TODO set updated_at, sending_error", err),
     };
 
-    Ok(())
-}
-
-// todo impl
-async fn send_to_fcm<'a>(message: Message<'a>) -> anyhow::Result<()> {
-    tokio::time::sleep(Duration::from_secs(1)).await;
-    println!("Message: {:?}", message);
     Ok(())
 }
