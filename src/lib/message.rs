@@ -3,10 +3,10 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Queryable)]
 pub struct Message {
-    notification_title: String,
-    notification_body: String,
-    data: HashMap<String, String>, // todo arbitrary JSON
-    collapse_key: String,
+    pub notification_title: String,
+    pub notification_body: String,
+    pub data: HashMap<String, String>, // todo arbitrary JSON
+    pub collapse_key: Option<String>,
 }
 
 pub struct Queue {}
