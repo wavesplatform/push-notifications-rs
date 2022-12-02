@@ -22,8 +22,9 @@ pub enum Message {
 pub struct LocalizedMessage {
     pub notification_title: String,
     pub notification_body: String,
-    //TODO more fields? what is data? do we know collapse_key?
 }
+
+//TODO Separate MessageData struct with the remaining fields: data, collapse_key etc.
 
 pub struct Queue {}
 
