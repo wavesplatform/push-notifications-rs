@@ -19,10 +19,16 @@ pub enum Message {
     },
 }
 
+pub struct LocalizedMessage {
+    pub notification_title: String,
+    pub notification_body: String,
+    //TODO more fields? what is data? do we know collapse_key?
+}
+
 pub struct Queue {}
 
 impl Queue {
-    pub async fn enqueue(&self, message: WithTimestamp<Message>) -> Result<(), Error> {
+    pub async fn enqueue(&self, message: WithTimestamp<LocalizedMessage>) -> Result<(), Error> {
         todo!("message enqueue impl")
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
     error::Error,
-    message::{self, Message},
+    message::{self, LocalizedMessage, Message},
     model::AsBase58String,
     stream::{Event, OrderExecution},
     subscription::{self, Subscription, SubscriptionMode, Topic},
@@ -34,6 +34,7 @@ impl MessagePump {
         for subscription in subscriptions {
             let is_oneshot = subscription.mode == SubscriptionMode::Once;
             let msg = make_message(event, &subscription.topic);
+            let msg = localize_message(msg);
             self.messages.enqueue(msg.with_current_timestamp()).await?;
             if is_oneshot {
                 self.subscriptions.cancel(subscription).await;
@@ -95,4 +96,8 @@ fn make_message(event: &Event, topic: &Topic) -> Message {
         }
         (_, _) => unreachable!("unrecognized combination of subscription and event"),
     }
+}
+
+fn localize_message(msg: Message) -> LocalizedMessage {
+    todo!("use localization service")
 }
