@@ -20,34 +20,41 @@ impl RemoteGateway {
     }
 
     pub async fn ticker(&self, asset_id: &AssetId) -> Result<Ticker, Error> {
-        self.load(asset_id.to_owned()).await.map_err(Error::from)
+        self._asset(asset_id).await.map(|a| a.ticker.unwrap())
     }
 
     pub async fn decimals(&self, asset_id: &AssetId) -> Result<Decimals, Error> {
-        self.asset(asset_id).await.map(|a| a.precision)
+        self.load(asset_id.to_owned()).await.map_err(Error::from)
     }
 
-    async fn asset(&self, asset_id: &AssetId) -> Result<FullAssetInfo, Error> {
+    async fn _asset(&self, asset_id: &AssetId) -> Result<FullAssetInfo, Error> {
         self.load(asset_id.to_owned()).await.map_err(Error::from)
     }
 }
 
 #[async_trait]
-impl CachedLoader<AssetId, Ticker> for RemoteGateway {
-    type Cache = TimedCache<AssetId, Ticker>;
+impl CachedLoader<AssetId, Decimals> for RemoteGateway {
+    type Cache = UnboundCache<AssetId, Decimals>;
 
     type Error = Error;
 
-    async fn load_fn(&mut self, keys: &[AssetId]) -> Result<Vec<Ticker>, Self::Error> {}
+    async fn load_fn(&mut self, keys: &[AssetId]) -> Result<Vec<Decimals>, Self::Error> {
+        let mut result = vec![];
+        for asset_id in keys {
+            let asset = self._asset(asset_id).await?;
+            result.push(asset.precision)
+        }
+        Ok(result)
+    }
 
     fn init_cache() -> Self::Cache {
-        TimedCache::with_lifespan(60 * 60 * 24)
+        UnboundCache::new()
     }
 }
 
 #[async_trait]
 impl CachedLoader<AssetId, FullAssetInfo> for RemoteGateway {
-    type Cache = UnboundCache<AssetId, FullAssetInfo>;
+    type Cache = TimedCache<AssetId, FullAssetInfo>;
 
     type Error = Error;
 
@@ -68,6 +75,6 @@ impl CachedLoader<AssetId, FullAssetInfo> for RemoteGateway {
     }
 
     fn init_cache() -> Self::Cache {
-        UnboundCache::new()
+        TimedCache::with_lifespan(60 * 60 * 24)
     }
 }
