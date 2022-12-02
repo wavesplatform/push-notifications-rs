@@ -1,6 +1,6 @@
 use crate::error::Error;
 use wavesexchange_apis::{
-    assets::dto::{AssetInfo, OutputFormat},
+    assets::dto::{AssetInfo, FullAssetInfo, OutputFormat},
     AssetsService, HttpClient,
 };
 use wavesexchange_loaders::{CachedLoader, Loader as _, TimedCache, UnboundCache};
@@ -24,6 +24,10 @@ impl RemoteGateway {
     }
 
     pub async fn decimals(&self, asset_id: &AssetId) -> Result<Decimals, Error> {
+        self.asset(asset_id).await.map(|a| a.precision)
+    }
+
+    async fn asset(&self, asset_id: &AssetId) -> Result<FullAssetInfo, Error> {
         self.load(asset_id.to_owned()).await.map_err(Error::from)
     }
 }
@@ -34,21 +38,7 @@ impl CachedLoader<AssetId, Ticker> for RemoteGateway {
 
     type Error = Error;
 
-    async fn load_fn(&mut self, keys: &[AssetId]) -> Result<Vec<Ticker>, Self::Error> {
-        let mut result = vec![];
-        for asset_id in keys {
-            let mut asset = self
-                .assets_client
-                .get([asset_id], None, OutputFormat::Brief, false)
-                .await?;
-            if let Some(AssetInfo::Brief(a)) = asset.data.remove(0).data {
-                result.push(a.ticker.unwrap());
-            } else {
-                unreachable!("Brief info expected")
-            }
-        }
-        Ok(result)
-    }
+    async fn load_fn(&mut self, keys: &[AssetId]) -> Result<Vec<Ticker>, Self::Error> {}
 
     fn init_cache() -> Self::Cache {
         TimedCache::with_lifespan(60 * 60 * 24)
@@ -56,20 +46,20 @@ impl CachedLoader<AssetId, Ticker> for RemoteGateway {
 }
 
 #[async_trait]
-impl CachedLoader<AssetId, Decimals> for RemoteGateway {
-    type Cache = UnboundCache<AssetId, Decimals>;
+impl CachedLoader<AssetId, FullAssetInfo> for RemoteGateway {
+    type Cache = UnboundCache<AssetId, FullAssetInfo>;
 
     type Error = Error;
 
-    async fn load_fn(&mut self, keys: &[AssetId]) -> Result<Vec<Decimals>, Self::Error> {
+    async fn load_fn(&mut self, keys: &[AssetId]) -> Result<Vec<FullAssetInfo>, Self::Error> {
         let mut result = vec![];
         for asset_id in keys {
             let mut asset = self
                 .assets_client
-                .get([asset_id], None, OutputFormat::Brief, false)
+                .get([asset_id], None, OutputFormat::Full, false)
                 .await?;
             if let Some(AssetInfo::Full(a)) = asset.data.remove(0).data {
-                result.push(a.precision)
+                result.push(a)
             } else {
                 unreachable!("Full info expected")
             }
