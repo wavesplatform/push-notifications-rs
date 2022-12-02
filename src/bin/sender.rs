@@ -1,9 +1,9 @@
 use diesel::{prelude::*, Connection, PgConnection};
 use fcm::Message;
-use lib::{config::PostgresConfig, schema::messages, Error};
+use lib::{config::PostgresConfig, schema::messages};
 use std::{collections::HashMap, time::Duration};
 
-type UID = i32;
+// type UID = i32;
 
 const FCM_API_KEY_TEMP: &str = "key-0";
 
@@ -13,7 +13,7 @@ async fn main() -> anyhow::Result<()> {
     let mut conn = PgConnection::establish(&dbconfig.database_url())?;
 
     // get oldest message
-    let (notification_title, notification_body, collapse_key): (String, String, Option<String>) =
+    let (notification_title, notification_body, _collapse_key): (String, String, Option<String>) =
         messages::table
             .select((
                 messages::notification_title,
@@ -25,9 +25,6 @@ async fn main() -> anyhow::Result<()> {
             .first(&mut conn)?;
 
     // let client = fcm::Client::new();
-
-    // let mut map = HashMap::new();
-    // map.insert("message", "Howdy!");
 
     let notification = {
         let mut builder = fcm::NotificationBuilder::new();
@@ -49,12 +46,13 @@ async fn main() -> anyhow::Result<()> {
         // builder.collapse_key(&k);
         // }
 
-        builder.finalize()
-
         // todo ttl
         // todo priority
+
+        builder.finalize()
     };
 
+    // todo post-send action
     match send_to_fcm(message).await {
         Ok(()) => println!("Send succesful; TODO delete"),
         Err(err) => eprintln!("Send error: {:?}. TODO set updated_at, sending_error", err),
@@ -63,6 +61,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+// todo impl
 async fn send_to_fcm<'a>(message: Message<'a>) -> anyhow::Result<()> {
     tokio::time::sleep(Duration::from_secs(1)).await;
     println!("Message: {:?}", message);
