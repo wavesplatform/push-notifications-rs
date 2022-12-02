@@ -1,3 +1,4 @@
+// Temporary file with instructions how2 build lokalise client
 use wavesexchange_apis::HttpClient;
 
 mod config;
