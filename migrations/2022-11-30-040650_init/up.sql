@@ -39,11 +39,11 @@ CREATE TABLE IF NOT EXISTS messages (
     uid serial not null primary key,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
-    subscription_uid integer,
+    subscription_uid integer not null,
     notification_title varchar not null,
     notification_body varchar not null,
-    data jsonb not null,
+    data jsonb,
     collapse_key varchar,
-    sending_error varchar,
+    sending_error varchar, -- todo move to separate tables to support miltiple devices and retries
     foreign key (subscription_uid) references subscriptions(uid)
 );

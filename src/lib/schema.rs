@@ -1,7 +1,8 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    devices (subscriber_address, fcm_uid) {
+    devices (uid) {
+        uid -> Int4,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         fcm_uid -> Varchar,
@@ -11,13 +12,14 @@ diesel::table! {
 }
 
 diesel::table! {
-    messages (subscription_uid, created_at) {
+    messages (uid) {
+        uid -> Int4,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         subscription_uid -> Int4,
         notification_title -> Varchar,
         notification_body -> Varchar,
-        data -> Jsonb,
+        data -> Nullable<Jsonb>,
         collapse_key -> Nullable<Varchar>,
         sending_error -> Nullable<Varchar>,
     }
@@ -33,9 +35,9 @@ diesel::table! {
 
 diesel::table! {
     subscriptions (subscriber_address, topic) {
+        uid -> Int4,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
-        uid -> Int4,
         subscriber_address -> Varchar,
         topic -> Varchar,
         topic_type -> Int4,

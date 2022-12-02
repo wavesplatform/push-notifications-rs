@@ -4,6 +4,7 @@
 extern crate diesel;
 
 pub mod config;
+pub mod schema;
 
 mod asset;
 mod device;
@@ -15,6 +16,9 @@ mod stream;
 mod subscription;
 
 use chrono::{DateTime, Utc};
+
+pub use error::Error;
+pub use message::Message;
 
 pub struct WithTimestamp<T> {
     timestamp: DateTime<Utc>,
