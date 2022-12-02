@@ -20,6 +20,7 @@ wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs
 diesel = { version = "2.0", default-features = false, features = ["postgres", "serde_json", "without-deprecated"] }
 diesel_migrations = "2.0"
 anyhow = "1.0"
+fcm = "0.9"
 
 [lib]
 name = "lib"

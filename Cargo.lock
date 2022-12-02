@@ -496,6 +496,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "erased-serde"
+version = "0.3.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54558e0ba96fbe24280072642eceb9d7d442e32c7ec0ea9e7ecd7b4ea2cf4e11"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "errno"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -523,6 +532,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a407cfaa3385c4ae6b23e84623d48c2798d06e3e6a1878f7f59f17b3f86499"
 dependencies = [
  "instant",
+]
+
+[[package]]
+name = "fcm"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d8d0da8a6bd63bdec888b6d7a87c5698230005c1800823d28ddd5adb6f2550f"
+dependencies = [
+ "chrono",
+ "erased-serde",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1428,6 +1451,7 @@ dependencies = [
  "diesel",
  "diesel_migrations",
  "envy",
+ "fcm",
  "reqwest",
  "serde",
  "serde_json",
