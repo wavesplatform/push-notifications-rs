@@ -21,10 +21,10 @@ pub enum OrderExecution {
 }
 
 pub struct PriceOHLC {
-    open: f64,
-    close: f64,
-    low: f64,
-    high: f64,
+    open: u64,
+    close: u64,
+    low: u64,
+    high: u64,
 }
 
 pub enum Event {
@@ -44,21 +44,22 @@ pub enum Event {
 }
 
 impl PriceOHLC {
-    pub fn has_crossed_threshold(&self, other: &Self, threshold: f64) -> bool {
+    pub fn has_crossed_threshold(&self, other: &Self, threshold: u64) -> bool {
+        let threshold = threshold as i64;
         let mut prices = [
-            self.open,
-            self.close,
-            self.low,
-            self.high,
-            other.open,
-            other.close,
-            other.low,
-            other.high,
+            self.open as i64,
+            self.close as i64,
+            self.low as i64,
+            self.high as i64,
+            other.open as i64,
+            other.close as i64,
+            other.low as i64,
+            other.high as i64,
         ];
-        prices.sort_unstable_by(f64::total_cmp);
+        prices.sort_unstable_by(i64::cmp);
         prices
             .into_iter()
             .tuple_windows()
-            .any(|(a, b)| f64::signum(threshold - a) != f64::signum(threshold - b))
+            .any(|(a, b)| i64::signum(threshold - a) != i64::signum(threshold - b))
     }
 }

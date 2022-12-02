@@ -88,8 +88,14 @@ impl MessagePump {
                     price_asset_id,
                     price_threshold.asset_id().as_ref().expect("price")
                 );
-                let price_threshold = price_threshold.value() as f64; //TODO need to apply decimals
-                debug_assert!(current_price.has_crossed_threshold(previous_price, price_threshold));
+                debug_assert!(
+                    current_price.has_crossed_threshold(previous_price, price_threshold.value())
+                );
+                let decimals = self
+                    .assets
+                    .decimals(price_threshold.asset_id().as_ref().expect("price_asset"))
+                    .await?;
+                let price_threshold = apply_decimals(price_threshold.value(), decimals);
                 Message::PriceThresholdReached {
                     amount_asset_ticker: self.assets.ticker(amount_asset_id).await?,
                     price_asset_ticker: self.assets.ticker(price_asset_id).await?,
@@ -100,4 +106,9 @@ impl MessagePump {
         };
         Ok(res)
     }
+}
+
+fn apply_decimals(value: u64, decimals: u8) -> f64 {
+    let divisor = 1_u64 << decimals;
+    value as f64 / divisor as f64
 }
