@@ -1,7 +1,7 @@
 use crate::{
     error::Error,
-    stream::{OrderSide, OrderType},
-    WithTimestamp,
+    stream::{OrderExecution, OrderSide, OrderType},
+    timestamp::WithTimestamp,
 };
 
 pub enum Message {
@@ -10,13 +10,7 @@ pub enum Message {
         side: OrderSide,
         amount_asset_ticker: String,
         price_asset_ticker: String,
-    },
-    OrderPartiallyExecuted {
-        order_type: OrderType,
-        side: OrderSide,
-        amount_asset_ticker: String,
-        price_asset_ticker: String,
-        execution_percentage: f64,
+        execution: OrderExecution,
     },
     PriceThresholdReached {
         amount_asset_ticker: String,
@@ -25,10 +19,17 @@ pub enum Message {
     },
 }
 
+pub struct LocalizedMessage {
+    pub notification_title: String,
+    pub notification_body: String,
+}
+
+//TODO Separate MessageData struct with the remaining fields: data, collapse_key etc.
+
 pub struct Queue {}
 
 impl Queue {
-    pub async fn enqueue(message: WithTimestamp<Message>) -> Result<(), Error> {
-        todo!("impl")
+    pub async fn enqueue(&self, message: WithTimestamp<LocalizedMessage>) -> Result<(), Error> {
+        todo!("message enqueue impl")
     }
 }

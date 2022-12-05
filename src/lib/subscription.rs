@@ -1,15 +1,16 @@
 use chrono::{DateTime, Utc};
-use waves_rust::model::{Address, Amount, AssetId};
 
+use crate::model::{Address, Amount, AssetId};
 use crate::stream::Event;
 
 pub struct Subscription {
-    subscriber: Address,
-    created_at: DateTime<Utc>,
-    mode: SubscriptionMode,
-    topic: Topic,
+    pub subscriber: Address,
+    pub created_at: DateTime<Utc>,
+    pub mode: SubscriptionMode,
+    pub topic: Topic,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum SubscriptionMode {
     Once,
     Repeat,
@@ -30,7 +31,11 @@ pub struct Repo {}
 
 impl Repo {
     // probably will have different interface
-    pub async fn matching(event: &Event) -> Vec<Subscription> {
-        todo!("impl")
+    pub async fn matching(&self, event: &Event) -> Vec<Subscription> {
+        todo!("subscriptions repo impl")
+    }
+
+    pub async fn cancel(&self, subscription: Subscription) {
+        todo!("cancel oneshot subscription impl")
     }
 }
