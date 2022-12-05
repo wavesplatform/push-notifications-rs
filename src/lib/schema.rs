@@ -15,8 +15,8 @@ diesel::table! {
     messages (uid) {
         uid -> Int4,
         created_at -> Timestamptz,
-        updated_at -> Timestamptz,
-        send_attempts_count -> Int4,
+        scheduled_for -> Timestamptz,
+        send_attempts_count -> Int2,
         send_error -> Nullable<Varchar>,
         device_uid -> Int4,
         notification_title -> Varchar,

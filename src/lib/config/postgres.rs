@@ -9,6 +9,7 @@ use crate::error::Error;
 #[derive(Deserialize, Clone)]
 pub struct Config {
     pub host: String,
+    #[serde(default = "default_pgport")]
     pub port: u16,
     pub database: String,
     pub user: String,

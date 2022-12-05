@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_variables, unused_imports)]
 
+pub mod backoff;
 pub mod config;
 pub mod schema;
 
