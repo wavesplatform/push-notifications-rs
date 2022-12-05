@@ -22,7 +22,19 @@ pub struct MessagePump {
 }
 
 impl MessagePump {
-    //TODO pub fn new()
+    pub fn new(
+        subscriptions: subscription::Repo,
+        assets: asset::RemoteGateway,
+        localizer: localization::Repo,
+        messages: message::Queue,
+    ) -> Self {
+        MessagePump {
+            subscriptions,
+            assets,
+            localizer,
+            messages,
+        }
+    }
 
     pub async fn run_event_loop(&self, mut events: mpsc::Receiver<EventWithResult>) {
         while let Some(event) = events.recv().await {
