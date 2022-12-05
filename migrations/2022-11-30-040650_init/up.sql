@@ -5,12 +5,13 @@ CREATE TABLE IF NOT EXISTS subscribers (
 );
 
 CREATE TABLE IF NOT EXISTS devices (
-    uid serial not null primary key,
+    uid serial not null unique,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     fcm_uid varchar NOT NULL,
     subscriber_address varchar NOT NULL,
     language varchar NOT NULL,
+    primary key (subscriber_address, fcm_uid),
     foreign key (subscriber_address) references subscribers(address)
 );
 
@@ -38,12 +39,14 @@ create index on topics_price_threshold(amount_asset_id, price_asset_id, price_th
 CREATE TABLE IF NOT EXISTS messages (
     uid serial not null primary key,
     created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now(),
-    subscription_uid integer not null,
+    updated_at timestamptz not null default now(), -- creation or last send attempt
+    send_attempts_count integer not null default 0,
+    send_error varchar,
+    device_uid integer not null,
     notification_title varchar not null,
     notification_body varchar not null,
     data jsonb,
     collapse_key varchar,
-    sending_error varchar, -- todo move to separate tables to support miltiple devices and retries
-    foreign key (subscription_uid) references subscriptions(uid)
+    foreign key (device_uid) references devices(uid)
 );
+create index on messages(device_uid);

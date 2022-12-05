@@ -1,1 +1,1 @@
-drop table topics_price_threshold, messages, devices, subscriptions, subscribers;
+drop table messages, devices, topics_price_threshold, subscriptions, subscribers;

@@ -1,7 +1,7 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    devices (uid) {
+    devices (subscriber_address, fcm_uid) {
         uid -> Int4,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
@@ -16,12 +16,13 @@ diesel::table! {
         uid -> Int4,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
-        subscription_uid -> Int4,
+        send_attempts_count -> Int4,
+        send_error -> Nullable<Varchar>,
+        device_uid -> Int4,
         notification_title -> Varchar,
         notification_body -> Varchar,
         data -> Nullable<Jsonb>,
         collapse_key -> Nullable<Varchar>,
-        sending_error -> Nullable<Varchar>,
     }
 }
 
