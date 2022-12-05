@@ -1,7 +1,9 @@
+use std::{collections::HashMap, fmt::Display};
+
 use crate::{
     error::Error,
     message::{LocalizedMessage, Message},
-    model::Lang,
+    stream::OrderExecution,
 };
 use wavesexchange_apis::HttpClient;
 
@@ -16,37 +18,16 @@ impl RemoteGateway {
         RemoteGateway { lokalise_client }
     }
 
-    pub async fn localize(&self, message: &Message, lang: &str) -> Result<String, Error> {
-        let searched_key = match message { todo!() };
-        let keys = self
-            .lokalise_client
+    pub async fn localize(&self) -> Result<dto::KeysResponse, Error> {
+        self.lokalise_client
             .create_req_handler::<dto::KeysResponse>(
                 self.lokalise_client
                     .http_get(format!("projects/{PROJECT_ID}/keys?include_translations=1",)),
                 "lokalise::get",
             )
             .execute()
-            .await?;
-
-        keys.keys
-            .into_iter()
-            .find(|k| k.key_name.web == searched_key)
-            .map(|k| {
-                let err = Error::TranslationError(format!(
-                    "Translation by key '{searched_key}' and lang '{lang}' not found"
-                ));
-                match k.translations {
-                    Some(t) => t
-                        .into_iter()
-                        .find(|tr| tr.language_iso == lang)
-                        .map(|tr| tr.translation)
-                        .ok_or_else(|| err),
-                    None => Err(err),
-                }
-            })
-            .ok_or_else(|| {
-                Error::TranslationError(format!("Translation by key '{searched_key}' not found"))
-            })?
+            .await
+            .map_err(Error::from)
     }
 }
 
@@ -97,23 +78,78 @@ pub mod dto {
     }
 }
 
-pub struct Repo {}
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum Lang {
+    Ru,
+    En,
+    Es,
+}
+
+impl TryFrom<&str> for Lang {
+    type Error = Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        Ok(match s {
+            "ru" => Lang::Ru,
+            "en" => Lang::En,
+            "es" => Lang::Es,
+            lang => return Err(Error::Generic(format!("unknown language {lang}"))),
+        })
+    }
+}
+
+// {key: {lang: value}}
+pub type TranslationMap = HashMap<String, HashMap<Lang, String>>;
+
+pub struct Repo {
+    translations: TranslationMap,
+}
 
 impl Repo {
-    //TODO This is the factory method that can construct Repo during app startup.
-    // Does all the network calls and caches everything (using the lower-level gateway above).
-    // Can fail (this will lead to app crash on startup).
-    pub fn new() -> Result<Self, Error> {
-        todo!("localizer repo factory method impl")
+    pub async fn new(lokalise_client: HttpClient<()>) -> Result<Self, Error> {
+        let remote_gateway = RemoteGateway { lokalise_client };
+        let keys = remote_gateway.localize().await?;
+        let mut translations: TranslationMap = HashMap::new();
+
+        for key in keys.keys {
+            let key_name = key.key_name.web;
+
+            if let Some(t) = key.translations {
+                for tr in t {
+                    let lang = Lang::try_from(tr.language_iso.as_str())?;
+                    translations
+                        .entry(key_name.clone())
+                        .or_default()
+                        .insert(lang, tr.translation);
+                }
+            }
+        }
+
+        Ok(Self { translations })
     }
 
-    //TODO This is the higher-level localization that is totally infallible and never does any network calls
-    pub fn localize(&self, message: &Message, lang: &Lang) -> LocalizedMessage {
-        //TODO parse input message, decide which localization keys and arguments we need
-        match message {
-            Message::OrderExecuted { .. } => { /* TODO */ }
-            Message::PriceThresholdReached { .. } => { /* TODO */ }
+    pub fn localize(&self, message: &Message, lang: Lang) -> LocalizedMessage {
+        let translate = |key| self.translations[key][&lang].clone();
+
+        let (title, body) = match message {
+            Message::OrderExecuted { execution, .. } => {
+                let message = match execution {
+                    OrderExecution::Full => translate("orderFilledMessage"),
+                    OrderExecution::Partial { .. } => translate("orderPartFilledMessage"),
+                };
+                (
+                    translate("orderFilledTitle"),
+                    translate("orderFilledMessage"),
+                )
+            }
+            Message::PriceThresholdReached { .. } => {
+                (translate("priceAlertTitle"), translate("priceAlertMessage"))
+            }
+        };
+
+        LocalizedMessage {
+            notification_title: title,
+            notification_body: body,
         }
-        todo!("localize message impl")
     }
 }

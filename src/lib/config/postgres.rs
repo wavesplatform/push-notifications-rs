@@ -7,7 +7,7 @@ use std::{
 use crate::error::Error;
 
 #[derive(Deserialize, Clone)]
-pub struct Config {
+pub struct PostgresConfig {
     pub host: String,
     pub port: u16,
     pub database: String,
@@ -19,9 +19,9 @@ fn default_pgport() -> u16 {
     5432
 }
 
-impl Config {
+impl PostgresConfig {
     pub fn load() -> Result<Self, Error> {
-        Ok(envy::prefixed("PG").from_env::<Config>()?)
+        Ok(envy::prefixed("PG").from_env::<PostgresConfig>()?)
     }
 
     pub fn database_url(&self) -> String {
@@ -32,7 +32,7 @@ impl Config {
     }
 }
 
-impl Debug for Config {
+impl Debug for PostgresConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Intentionally avoid printing password for security reasons
         write!(
