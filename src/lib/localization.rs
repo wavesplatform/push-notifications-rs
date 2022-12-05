@@ -18,7 +18,7 @@ impl RemoteGateway {
         RemoteGateway { lokalise_client }
     }
 
-    pub async fn localize(&self) -> Result<dto::KeysResponse, Error> {
+    pub async fn keys(&self) -> Result<dto::KeysResponse, Error> {
         self.lokalise_client
             .create_req_handler::<dto::KeysResponse>(
                 self.lokalise_client
@@ -99,7 +99,7 @@ impl TryFrom<&str> for Lang {
 }
 
 // {key: {lang: value}}
-pub type TranslationMap = HashMap<String, HashMap<Lang, String>>;
+type TranslationMap = HashMap<String, HashMap<Lang, String>>;
 
 pub struct Repo {
     translations: TranslationMap,
@@ -108,7 +108,7 @@ pub struct Repo {
 impl Repo {
     pub async fn new(lokalise_client: HttpClient<()>) -> Result<Self, Error> {
         let remote_gateway = RemoteGateway { lokalise_client };
-        let keys = remote_gateway.localize().await?;
+        let keys = remote_gateway.keys().await?;
         let mut translations: TranslationMap = HashMap::new();
 
         for key in keys.keys {
