@@ -1,4 +1,10 @@
-#![allow(dead_code, unused_variables, unused_imports)]
+#![allow(dead_code, unused_variables)]
+
+#[macro_use]
+extern crate async_trait;
+
+#[macro_use]
+extern crate diesel;
 
 pub mod backoff;
 pub mod config;

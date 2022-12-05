@@ -1,13 +1,14 @@
 use crate::{
     error::Error,
     message::{LocalizedMessage, Message},
+    model::Lang,
 };
 
 //TODO This is a low-level gateway to Localizer, can be private, no need to be public
 struct RemoteGateway {}
 
 impl RemoteGateway {
-    pub async fn localize(message: &Message) -> Result<String, Error> {
+    pub async fn localize(message: &Message, lang: &Lang) -> Result<String, Error> {
         todo!()
     }
 }
@@ -23,7 +24,7 @@ impl Repo {
     }
 
     //TODO This is the higher-level localization that is totally infallible and never does any network calls
-    pub fn localize(&self, message: &Message) -> LocalizedMessage {
+    pub fn localize(&self, message: &Message, lang: &Lang) -> LocalizedMessage {
         //TODO parse input message, decide which localization keys and arguments we need
         match message {
             Message::OrderExecuted { .. } => { /* TODO */ }
