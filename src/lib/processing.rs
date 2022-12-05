@@ -1,7 +1,7 @@
 use crate::{
     asset, device,
     error::Error,
-    localization,
+    localization::{self, Lang},
     message::{self, LocalizedMessage, Message, PreparedMessage},
     stream::{Event, OrderExecution},
     subscription::{self, Subscription, SubscriptionMode, Topic},
@@ -54,7 +54,9 @@ impl MessagePump {
             let msg = self.make_message(event, &subscription.topic).await?;
             let devices = self.devices.subscribers(&subscription.subscriber).await?;
             for device in devices {
-                let message = self.localizer.localize(&msg, &device.lang);
+                let message = self
+                    .localizer
+                    .localize(&msg, Lang::try_from(device.lang.as_str())?);
                 let prepared_message = PreparedMessage {
                     device,
                     message,
