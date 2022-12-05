@@ -42,14 +42,11 @@ CREATE TABLE IF NOT EXISTS messages (
     updated_at timestamptz not null default now(), -- creation or last send attempt
     send_attempts_count integer not null default 0,
     send_error varchar,
-    subscription_uid integer not null,
     device_uid integer not null,
     notification_title varchar not null,
     notification_body varchar not null,
     data jsonb,
     collapse_key varchar,
-    foreign key (subscription_uid) references subscriptions(uid),
     foreign key (device_uid) references devices(uid)
 );
-create index on messages(subscription_uid);
 create index on messages(device_uid);
