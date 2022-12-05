@@ -1,8 +1,8 @@
 use crate::{
-    asset,
+    asset, device,
     error::Error,
     localization,
-    message::{self, LocalizedMessage, Message},
+    message::{self, LocalizedMessage, Message, PreparedMessage},
     stream::{Event, OrderExecution},
     subscription::{self, Subscription, SubscriptionMode, Topic},
     timestamp::WithCurrentTimestamp,
@@ -17,6 +17,7 @@ pub struct EventWithResult {
 pub struct MessagePump {
     subscriptions: subscription::Repo,
     assets: asset::RemoteGateway,
+    devices: device::Repo,
     localizer: localization::Repo,
     messages: message::Queue,
 }
@@ -25,12 +26,14 @@ impl MessagePump {
     pub fn new(
         subscriptions: subscription::Repo,
         assets: asset::RemoteGateway,
+        devices: device::Repo,
         localizer: localization::Repo,
         messages: message::Queue,
     ) -> Self {
         MessagePump {
             subscriptions,
             assets,
+            devices,
             localizer,
             messages,
         }
@@ -49,8 +52,19 @@ impl MessagePump {
         for subscription in subscriptions {
             let is_oneshot = subscription.mode == SubscriptionMode::Once;
             let msg = self.make_message(event, &subscription.topic).await?;
-            let msg = self.localizer.localize(&msg);
-            self.messages.enqueue(msg.with_current_timestamp()).await?;
+            let devices = self.devices.subscribers(&subscription.subscriber).await?;
+            for device in devices {
+                let message = self.localizer.localize(&msg, &device.lang);
+                let prepared_message = PreparedMessage {
+                    device,
+                    message,
+                    data: None,
+                    collapse_key: None,
+                };
+                self.messages
+                    .enqueue(prepared_message.with_current_timestamp())
+                    .await?;
+            }
             if is_oneshot {
                 self.subscriptions.cancel(subscription).await;
             }

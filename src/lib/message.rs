@@ -1,4 +1,5 @@
 use crate::{
+    device::Device,
     error::Error,
     stream::{OrderExecution, OrderSide, OrderType},
     timestamp::WithTimestamp,
@@ -24,12 +25,17 @@ pub struct LocalizedMessage {
     pub notification_body: String,
 }
 
-//TODO Separate MessageData struct with the remaining fields: data, collapse_key etc.
+pub struct PreparedMessage {
+    pub device: Device, // device_uid and address
+    pub message: LocalizedMessage,
+    pub data: Option<()>, //TODO specify correct type instead of `()`
+    pub collapse_key: Option<String>,
+}
 
 pub struct Queue {}
 
 impl Queue {
-    pub async fn enqueue(&self, message: WithTimestamp<LocalizedMessage>) -> Result<(), Error> {
+    pub async fn enqueue(&self, message: WithTimestamp<PreparedMessage>) -> Result<(), Error> {
         todo!("message enqueue impl")
     }
 }

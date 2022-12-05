@@ -4,3 +4,5 @@
 // that crate stores data as bytes while we often need base58 strings,
 // so a lot of unnecessary conversion occurs
 pub use waves_rust::model::{Address, Amount, AssetId};
+
+pub type Lang = String;
