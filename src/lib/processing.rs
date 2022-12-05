@@ -121,6 +121,6 @@ impl MessagePump {
 }
 
 fn apply_decimals(value: u64, decimals: u8) -> f64 {
-    let divisor = 1_u64 << decimals;
+    let divisor = 1_u64.pow(decimals as u32);
     value as f64 / divisor as f64
 }
