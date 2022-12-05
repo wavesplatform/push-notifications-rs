@@ -16,19 +16,24 @@ async fn main() -> Result<(), Error> {
     let message_to_send = postgres::dequeue(&mut conn)?;
 
     match message_to_send {
-        None => tokio::time::sleep(Duration::from_secs(EMPTY_QUEUE_POLL_PERIOD_SECS)).await,
+        None => {
+            println!("NO MESSAGES | Sleep {}s", EMPTY_QUEUE_POLL_PERIOD_SECS);
+            tokio::time::sleep(Duration::from_secs(EMPTY_QUEUE_POLL_PERIOD_SECS)).await;
+        }
         Some(message) => {
             // todo check eligibility to send using exponential backoff
             // for now, no retries. 1 attempt per message
             if message.send_attempts_count > 0 {
+                println!("SKIP | Message {}", message.uid);
                 postgres::skip(&mut conn, message.uid, Utc::now())?;
             } else {
                 // message is eligible for sending
                 let fcm_msg = formatter::message(&config.fcm_api_key, &message);
 
                 // todo ttl
-                // match fcm::Client::new().send(fcm_msg).await.map(|_| ()) {
+
                 match Ok::<fcm::Message, fcm::FcmError>(fcm_msg).map(|_| ()) {
+                    // match fcm::Client::new().send(fcm_msg).await.map(|_| ()) {
                     Ok(()) => {
                         println!("SUCCESS | Message {}", message.uid);
                         postgres::ack(&mut conn, message.uid)?;
