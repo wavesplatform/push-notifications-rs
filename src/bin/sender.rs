@@ -39,13 +39,13 @@ async fn main() -> Result<(), Error> {
                         + backoff::exponential(
                             &config.sender.exponential_backoff_initial_interval,
                             config.sender.exponential_backoff_multiplier,
-                            message.send_attempts_count.try_into().unwrap(), // safe by DB constraint
+                            message.send_attempts_count,
                         );
 
                     postgres::nack(
                         &mut conn,
                         message.uid,
-                        message.send_attempts_count + 1,
+                        message.send_attempts_count as i16 + 1,
                         format!("{:?}", err),
                         scheduled_for,
                     )?;
@@ -64,7 +64,8 @@ pub struct MessageToSend {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub send_error: Option<String>,
-    pub send_attempts_count: i16,
+    #[diesel(deserialize_as = i16)]
+    pub send_attempts_count: u8,
     pub notification_title: String,
     pub notification_body: String,
     pub collapse_key: Option<String>,
