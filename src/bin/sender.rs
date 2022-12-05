@@ -5,7 +5,7 @@ use std::time::Duration;
 
 // todo proper logging
 
-const EMPTY_QUEUE_POLL_PERIOD_SECS: u64 = 5;
+const EMPTY_QUEUE_POLL_PERIOD: Duration = Duration::from_secs(5);
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -18,8 +18,8 @@ async fn main() -> Result<(), Error> {
 
     match message_to_send {
         None => {
-            println!("NO MESSAGES | Sleep {}s", EMPTY_QUEUE_POLL_PERIOD_SECS);
-            tokio::time::sleep(Duration::from_secs(EMPTY_QUEUE_POLL_PERIOD_SECS)).await;
+            println!("NO MESSAGES | Sleep {:?}", EMPTY_QUEUE_POLL_PERIOD);
+            tokio::time::sleep(EMPTY_QUEUE_POLL_PERIOD).await;
         }
         Some(message) => {
             // todo check eligibility to send using exponential backoff
