@@ -65,6 +65,8 @@ diesel::joinable!(failed_send_attempts -> devices (device_uid));
 diesel::joinable!(failed_send_attempts -> messages (message_uid));
 diesel::joinable!(subscriptions -> subscribers (subscriber_address));
 
+diesel::joinable_inner!(messages (subscription_uid) -> subscriptions (uid));
+
 diesel::allow_tables_to_appear_in_same_query!(
     devices,
     failed_send_attempts,

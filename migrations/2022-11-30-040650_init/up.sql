@@ -5,15 +5,15 @@ CREATE TABLE IF NOT EXISTS subscribers (
 );
 
 CREATE TABLE IF NOT EXISTS devices (
-    uid serial not null primary key,
+    uid serial not null unique,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     fcm_uid varchar NOT NULL,
     subscriber_address varchar NOT NULL,
     language varchar NOT NULL,
+    primary key (subscriber_address, fcm_uid),
     foreign key (subscriber_address) references subscribers(address)
 );
-create index on devices(subscriber_address);
 
 CREATE TABLE IF NOT EXISTS subscriptions (
     uid serial not null unique,
@@ -39,22 +39,16 @@ create index on topics_price_threshold(amount_asset_id, price_asset_id, price_th
 CREATE TABLE IF NOT EXISTS messages (
     uid serial not null primary key,
     created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(), -- creation or last send attempt
+    send_attempts_count integer not null default 0,
     subscription_uid integer not null,
+    device_uid varchar not null,
     notification_title varchar not null,
     notification_body varchar not null,
     data jsonb,
     collapse_key varchar,
-    foreign key (subscription_uid) references subscriptions(uid)
-);
-create index on messages(subscription_uid);
-
-CREATE TABLE IF NOT EXISTS failed_send_attempts (
-    attempted_at timestamptz not null default now(),
-    message_uid integer not null,
-    device_uid integer not null,
-    error_reason varchar not null,
-    primary key (message_uid, attempted_at, device_uid),
-    foreign key (message_uid) references messages(uid),
+    foreign key (subscription_uid) references subscriptions(uid),
     foreign key (device_uid) references devices(uid)
 );
-create index on failed_send_attempts(device_uid);
+create index on messages(subscription_uid);
+create index on messages(device_uid);
