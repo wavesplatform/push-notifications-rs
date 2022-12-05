@@ -137,10 +137,7 @@ impl Repo {
                     OrderExecution::Full => translate("orderFilledMessage"),
                     OrderExecution::Partial { .. } => translate("orderPartFilledMessage"),
                 };
-                (
-                    translate("orderFilledTitle"),
-                    translate("orderFilledMessage"),
-                )
+                (translate("orderFilledTitle"), message)
             }
             Message::PriceThresholdReached { .. } => {
                 (translate("priceAlertTitle"), translate("priceAlertMessage"))
