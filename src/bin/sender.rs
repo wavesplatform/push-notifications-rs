@@ -19,6 +19,7 @@ async fn main() -> Result<(), Error> {
                 config.sender.empty_queue_poll_period
             );
             tokio::time::sleep(config.sender.empty_queue_poll_period.to_std().unwrap()).await;
+            // .unwrap() is safe, non-negativity is validated on config load (u32)
         }
         Some(message) => {
             let fcm_msg = formatter::message(&config.sender.fcm_api_key, &message);
