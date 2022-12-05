@@ -1,1 +1,1 @@
-drop table failed_send_attempts, messages, devices, topics_price_threshold, subscriptions, subscribers;
+drop table messages, devices, topics_price_threshold, subscriptions, subscribers;
