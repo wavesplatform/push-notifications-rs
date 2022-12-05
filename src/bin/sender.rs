@@ -9,6 +9,7 @@ const EMPTY_QUEUE_POLL_PERIOD_SECS: u64 = 5;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    // todo loop
     let config = Config::load()?;
     let mut conn = PgConnection::establish(&config.postgres.database_url())?;
 
@@ -71,6 +72,7 @@ pub struct MessageToSend {
     pub fcm_uid: String,
 }
 
+// todo db transactions
 mod postgres {
     use crate::MessageToSend;
     use chrono::{DateTime, Utc};
