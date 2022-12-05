@@ -17,7 +17,7 @@ thiserror = "1.0"
 reqwest = { version = "0.11", features = ["json"] }
 wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
 wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.3" }
-diesel = { version = "2.0", default-features = false, features = ["postgres", "serde_json", "without-deprecated"] }
+diesel = { version = "2.0", default-features = false, features = ["postgres", "chrono", "serde_json", "without-deprecated"] }
 diesel_migrations = "2.0"
 anyhow = "1.0"
 fcm = "0.9"
