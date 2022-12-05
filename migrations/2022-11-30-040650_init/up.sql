@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS messages (
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(), -- creation or last send attempt
     send_attempts_count integer not null default 0,
+    send_error varchar,
     subscription_uid integer not null,
     device_uid integer not null,
     notification_title varchar not null,

@@ -17,6 +17,7 @@ diesel::table! {
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         send_attempts_count -> Int4,
+        send_error -> Nullable<Varchar>,
         subscription_uid -> Int4,
         device_uid -> Int4,
         notification_title -> Varchar,
