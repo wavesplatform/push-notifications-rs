@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::model::{AssetId, ByteString};
 use wavesexchange_apis::{
     assets::dto::{AssetInfo, FullAssetInfo, OutputFormat},
     AssetsService, HttpClient,
@@ -6,8 +7,7 @@ use wavesexchange_apis::{
 use wavesexchange_loaders::{CachedLoader, Loader as _, TimedCache, UnboundCache};
 
 type Ticker = String;
-type Decimals = i32;
-type AssetId = String;
+type Decimals = u8;
 
 #[derive(Clone)]
 pub struct RemoteGateway {
@@ -42,7 +42,7 @@ impl CachedLoader<AssetId, Decimals> for RemoteGateway {
         let mut result = vec![];
         for asset_id in keys {
             let asset = self._asset(asset_id).await?;
-            result.push(asset.precision)
+            result.push(asset.precision as u8)
         }
         Ok(result)
     }
@@ -63,7 +63,7 @@ impl CachedLoader<AssetId, FullAssetInfo> for RemoteGateway {
         for asset_id in keys {
             let mut asset = self
                 .assets_client
-                .get([asset_id], None, OutputFormat::Full, false)
+                .get([asset_id.encoded()], None, OutputFormat::Full, false)
                 .await?;
             if let Some(AssetInfo::Full(a)) = asset.data.remove(0).data {
                 result.push(a)
