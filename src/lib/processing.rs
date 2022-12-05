@@ -7,7 +7,12 @@ use crate::{
     subscription::{self, Subscription, SubscriptionMode, Topic},
     timestamp::WithCurrentTimestamp,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
+
+pub struct EventWithResult {
+    pub event: Event,
+    pub result_tx: oneshot::Sender<Result<(), Error>>,
+}
 
 pub struct MessagePump {
     subscriptions: subscription::Repo,
@@ -19,17 +24,12 @@ pub struct MessagePump {
 impl MessagePump {
     //TODO pub fn new()
 
-    pub async fn run_event_loop(&self, mut events: mpsc::Receiver<Event>) {
+    pub async fn run_event_loop(&self, mut events: mpsc::Receiver<EventWithResult>) {
         while let Some(event) = events.recv().await {
+            let EventWithResult { event, result_tx } = event;
             let res = self.process_event(&event).await;
-            if let Err(err) = res {
-                self.handle_error(event, err).await;
-            }
+            result_tx.send(res).expect("ack");
         }
-    }
-
-    async fn handle_error(&self, _event: Event, _error: Error) {
-        todo!("handle error"); // what to do with a failed event? Store for re-processing?
     }
 
     async fn process_event(&self, event: &Event) -> Result<(), Error> {
