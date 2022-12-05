@@ -1,7 +1,7 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    devices (uid) {
+    devices (subscriber_address, fcm_uid) {
         uid -> Int4,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
@@ -12,19 +12,13 @@ diesel::table! {
 }
 
 diesel::table! {
-    failed_send_attempts (message_uid, attempted_at, device_uid) {
-        attempted_at -> Timestamptz,
-        message_uid -> Int4,
-        device_uid -> Int4,
-        error_reason -> Varchar,
-    }
-}
-
-diesel::table! {
     messages (uid) {
         uid -> Int4,
         created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+        send_attempts_count -> Int4,
         subscription_uid -> Int4,
+        device_uid -> Int4,
         notification_title -> Varchar,
         notification_body -> Varchar,
         data -> Nullable<Jsonb>,
@@ -61,15 +55,10 @@ diesel::table! {
 }
 
 diesel::joinable!(devices -> subscribers (subscriber_address));
-diesel::joinable!(failed_send_attempts -> devices (device_uid));
-diesel::joinable!(failed_send_attempts -> messages (message_uid));
 diesel::joinable!(subscriptions -> subscribers (subscriber_address));
-
-diesel::joinable_inner!(messages (subscription_uid) -> subscriptions (uid));
 
 diesel::allow_tables_to_appear_in_same_query!(
     devices,
-    failed_send_attempts,
     messages,
     subscribers,
     subscriptions,
