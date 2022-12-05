@@ -48,6 +48,6 @@ CREATE TABLE IF NOT EXISTS messages (
     data jsonb,
     collapse_key varchar,
     foreign key (device_uid) references devices(uid),
-    constraint send_attempts_count_non_negative check (send_attempts_count >= 0 and send_attempts_count < 256)
+    constraint send_attempts_count_u8 check (send_attempts_count >= 0 and send_attempts_count < 256)
 );
 create index on messages(device_uid);
