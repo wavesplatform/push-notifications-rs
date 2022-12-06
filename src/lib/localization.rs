@@ -1,13 +1,22 @@
-use std::{collections::HashMap, fmt::Display};
+use std::collections::HashMap;
 
 use crate::{
     error::Error,
     message::{LocalizedMessage, Message},
+    model::Lang,
     stream::OrderExecution,
 };
 use wavesexchange_apis::HttpClient;
 
 const PROJECT_ID: &str = "8193754062287cbb2742a0.58698490";
+
+mod lokalise_keys {
+    pub const ORDER_FILLED_TITLE: &str = "orderFilledTitle";
+    pub const ORDER_FILLED_MSG: &str = "orderFilledMessage";
+    pub const ORDER_PART_FILLED_MSG: &str = "orderPartFilledMessage";
+    pub const PRICE_ALERT_TITLE: &str = "priceAlertTitle";
+    pub const PRICE_ALERT_MSG: &str = "priceAlertMessage";
+}
 
 struct RemoteGateway {
     lokalise_client: HttpClient<()>,
@@ -78,26 +87,6 @@ pub mod dto {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub enum Lang {
-    Ru,
-    En,
-    Es,
-}
-
-impl TryFrom<&str> for Lang {
-    type Error = Error;
-
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        Ok(match s {
-            "ru" => Lang::Ru,
-            "en" => Lang::En,
-            "es" => Lang::Es,
-            lang => return Err(Error::Generic(format!("unknown language {lang}"))),
-        })
-    }
-}
-
 // {key: {lang: value}}
 type TranslationMap = HashMap<String, HashMap<Lang, String>>;
 
@@ -106,7 +95,15 @@ pub struct Repo {
 }
 
 impl Repo {
-    pub async fn new(lokalise_client: HttpClient<()>) -> Result<Self, Error> {
+    pub async fn new(lokalise_sdk_token: &str) -> Result<Self, Error> {
+        let auth_header =
+            HashMap::from([("X-Api-Token".to_string(), lokalise_sdk_token.to_string())]);
+
+        let lokalise_client = HttpClient::<()>::builder()
+            .with_base_url("https://api.lokalise.co/api2")
+            .with_reqwest_builder(|rb| rb.default_headers((&auth_header).try_into().unwrap()))
+            .build();
+
         let remote_gateway = RemoteGateway { lokalise_client };
         let keys = remote_gateway.keys().await?;
         let mut translations: TranslationMap = HashMap::new();
@@ -116,11 +113,10 @@ impl Repo {
 
             if let Some(t) = key.translations {
                 for tr in t {
-                    let lang = Lang::try_from(tr.language_iso.as_str())?;
                     translations
                         .entry(key_name.clone())
                         .or_default()
-                        .insert(lang, tr.translation);
+                        .insert(tr.language_iso, tr.translation);
                 }
             }
         }
@@ -128,25 +124,25 @@ impl Repo {
         Ok(Self { translations })
     }
 
-    pub fn localize(&self, message: &Message, lang: Lang) -> LocalizedMessage {
-        let translate = |key| self.translations[key][&lang].clone();
+    pub fn localize(&self, message: &Message, lang: &Lang) -> Option<LocalizedMessage> {
+        let translate = |key| self.translations[key].get(lang).cloned();
 
-        let (title, body) = match message {
-            Message::OrderExecuted { execution, .. } => {
-                let message = match execution {
-                    OrderExecution::Full => translate("orderFilledMessage"),
-                    OrderExecution::Partial { .. } => translate("orderPartFilledMessage"),
-                };
-                (translate("orderFilledTitle"), message)
-            }
-            Message::PriceThresholdReached { .. } => {
-                (translate("priceAlertTitle"), translate("priceAlertMessage"))
-            }
+        let title = match message {
+            Message::OrderExecuted { .. } => lokalise_keys::ORDER_FILLED_TITLE,
+            Message::PriceThresholdReached { .. } => lokalise_keys::PRICE_ALERT_TITLE,
         };
 
-        LocalizedMessage {
-            notification_title: title,
-            notification_body: body,
-        }
+        let body = match message {
+            Message::OrderExecuted { execution, .. } => match execution {
+                OrderExecution::Full => lokalise_keys::ORDER_FILLED_MSG,
+                OrderExecution::Partial { .. } => lokalise_keys::ORDER_PART_FILLED_MSG,
+            },
+            Message::PriceThresholdReached { .. } => lokalise_keys::PRICE_ALERT_MSG,
+        };
+
+        Some(LocalizedMessage {
+            notification_title: translate(title)?,
+            notification_body: translate(body)?,
+        })
     }
 }
