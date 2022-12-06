@@ -38,7 +38,7 @@ impl Debug for Config {
         // Intentionally avoid printing password for security reasons
         write!(
             f,
-            "Postgres(server={}:{}; database={}; user={})",
+            "Postgres(server={}:{}; database={}; user={}; password=***)",
             self.host, self.port, self.database, self.user
         )
     }

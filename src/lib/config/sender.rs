@@ -68,7 +68,7 @@ fn default_send_max_attempts() -> u8 {
 
 impl Debug for Config {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        // Intentionally avoid printing password for security reasons
+        // Intentionally avoid printing FCM API Key for security reasons
         write!(
             f,
             "Sender(empty_queue_poll_period={}s; exponential_backoff_initial_interval={}s; exponential_backoff_multiplier={}; send_max_attempts={}; fcm_api_key=***)",
