@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1.59"
+futures = "0.3"
 tokio = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 waves-rust = "0.2.0"
@@ -22,6 +23,7 @@ wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs"
 wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.3" }
 diesel = { version = "2.0", default-features = false, features = ["postgres", "chrono", "serde_json", "without-deprecated"] }
 diesel_migrations = "2.0"
+diesel-async = { version = "0.1", features = ["postgres"] }
 anyhow = "1.0"
 itertools = "0.10"
 fcm = "0.9"
@@ -37,6 +39,10 @@ path = "src/bin/migration.rs"
 [[bin]]
 name = "api"
 path = "src/bin/api.rs"
+
+[[bin]]
+name = "processor"
+path = "src/bin/processor.rs"
 
 [[bin]]
 name = "sender"

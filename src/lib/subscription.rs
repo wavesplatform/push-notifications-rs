@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use diesel_async::AsyncPgConnection;
 
 use crate::model::{Address, Amount, AssetId};
 use crate::stream::Event;
@@ -30,12 +31,11 @@ pub enum Topic {
 pub struct Repo {}
 
 impl Repo {
-    // probably will have different interface
-    pub async fn matching(&self, event: &Event) -> Vec<Subscription> {
+    pub async fn matching(&self, event: &Event, conn: &mut AsyncPgConnection) -> Vec<Subscription> {
         todo!("subscriptions repo impl")
     }
 
-    pub async fn cancel(&self, subscription: Subscription) {
+    pub async fn cancel(&self, subscription: Subscription, conn: &mut AsyncPgConnection) {
         todo!("cancel oneshot subscription impl")
     }
 }

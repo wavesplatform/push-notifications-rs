@@ -1,3 +1,5 @@
+use diesel_async::AsyncPgConnection;
+
 use crate::{
     device::Device,
     error::Error,
@@ -35,7 +37,11 @@ pub struct PreparedMessage {
 pub struct Queue {}
 
 impl Queue {
-    pub async fn enqueue(&self, message: WithTimestamp<PreparedMessage>) -> Result<(), Error> {
+    pub async fn enqueue(
+        &self,
+        message: WithTimestamp<PreparedMessage>,
+        conn: &mut AsyncPgConnection,
+    ) -> Result<(), Error> {
         todo!("message enqueue impl")
     }
 }

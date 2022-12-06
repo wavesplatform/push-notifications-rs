@@ -1,3 +1,5 @@
+use diesel_async::AsyncPgConnection;
+
 use crate::{
     model::{Address, Lang},
     Error,
@@ -15,7 +17,11 @@ pub struct Device {
 pub struct Repo {}
 
 impl Repo {
-    pub async fn subscribers(&self, address: &Address) -> Result<Vec<Device>, Error> {
+    pub async fn subscribers(
+        &self,
+        address: &Address,
+        conn: &mut AsyncPgConnection,
+    ) -> Result<Vec<Device>, Error> {
         todo!("impl get devices by address")
     }
 }

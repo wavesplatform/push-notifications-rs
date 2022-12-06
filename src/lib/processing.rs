@@ -8,6 +8,9 @@ use crate::{
     subscription::{self, Subscription, SubscriptionMode, Topic},
     timestamp::WithCurrentTimestamp,
 };
+use diesel_async::{AsyncConnection, AsyncPgConnection};
+use futures::FutureExt;
+use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
 pub struct EventWithResult {
@@ -40,20 +43,34 @@ impl MessagePump {
         }
     }
 
-    pub async fn run_event_loop(&self, mut events: mpsc::Receiver<EventWithResult>) {
+    pub async fn run_event_loop(
+        self: Arc<Self>,
+        mut events: mpsc::Receiver<EventWithResult>,
+        mut conn: AsyncPgConnection,
+    ) {
         while let Some(event) = events.recv().await {
             let EventWithResult { event, result_tx } = event;
-            let res = self.process_event(&event).await;
+            let this = self.clone();
+            let res = conn
+                .transaction(|conn| {
+                    async move {
+                        // Asynchronously process this event within a database transaction
+                        this.process_event(event, conn).await
+                    }
+                    .boxed()
+                })
+                .await;
             result_tx.send(res).expect("ack");
         }
     }
 
-    async fn process_event(&self, event: &Event) -> Result<(), Error> {
-        let subscriptions = self.subscriptions.matching(event).await;
+    async fn process_event(&self, event: Event, conn: &mut AsyncPgConnection) -> Result<(), Error> {
+        let subscriptions = self.subscriptions.matching(&event, conn).await;
         for subscription in subscriptions {
             let is_oneshot = subscription.mode == SubscriptionMode::Once;
-            let msg = self.make_message(event, &subscription.topic).await?;
-            let devices = self.devices.subscribers(&subscription.subscriber).await?;
+            let msg = self.make_message(&event, &subscription.topic).await?;
+            let address = &subscription.subscriber;
+            let devices = self.devices.subscribers(address, conn).await?;
             for device in devices {
                 let message = self.localize(&msg, &device.lang);
                 let prepared_message = PreparedMessage {
@@ -62,12 +79,11 @@ impl MessagePump {
                     data: None,
                     collapse_key: None,
                 };
-                self.messages
-                    .enqueue(prepared_message.with_current_timestamp())
-                    .await?;
+                let msg_with_timestamp = prepared_message.with_current_timestamp();
+                self.messages.enqueue(msg_with_timestamp, conn).await?;
             }
             if is_oneshot {
-                self.subscriptions.cancel(subscription).await;
+                self.subscriptions.cancel(subscription, conn).await;
             }
         }
         Ok(())
