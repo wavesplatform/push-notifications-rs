@@ -8,7 +8,7 @@ use wavesexchange_log::{debug, error, info};
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let config = Config::load()?;
-    debug!("Start sender with config {:?}", config);
+    debug!("Sender started with config {:?}", config);
 
     let mut conn = PgConnection::establish(&config.postgres.database_url())?;
 
