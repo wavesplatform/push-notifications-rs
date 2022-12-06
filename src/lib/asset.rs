@@ -1,13 +1,19 @@
 use crate::error::Error;
 use crate::model::{AssetId, ByteString};
 use wavesexchange_apis::{
-    assets::dto::{AssetInfo, FullAssetInfo, OutputFormat},
+    assets::dto::{AssetInfo, OutputFormat},
     AssetsService, HttpClient,
 };
 use wavesexchange_loaders::{CachedLoader, Loader as _, TimedCache, UnboundCache};
 
-type Ticker = String;
+type Ticker = Option<String>;
 type Decimals = u8;
+
+#[derive(Debug, Clone)]
+struct LocalAssetInfo {
+    ticker: Ticker,
+    decimals: Decimals,
+}
 
 #[derive(Clone)]
 pub struct RemoteGateway {
@@ -15,19 +21,20 @@ pub struct RemoteGateway {
 }
 
 impl RemoteGateway {
-    pub fn new(assets_client: HttpClient<AssetsService>) -> Self {
+    pub fn new(assets_url: impl AsRef<str>) -> Self {
+        let assets_client = HttpClient::<AssetsService>::from_base_url(assets_url.as_ref());
         RemoteGateway { assets_client }
     }
 
     pub async fn ticker(&self, asset_id: &AssetId) -> Result<Ticker, Error> {
-        self._asset(asset_id).await.map(|a| a.ticker.unwrap())
+        self.asset_info(asset_id).await.map(|a| a.ticker)
     }
 
     pub async fn decimals(&self, asset_id: &AssetId) -> Result<Decimals, Error> {
         self.load(asset_id.to_owned()).await.map_err(Error::from)
     }
 
-    async fn _asset(&self, asset_id: &AssetId) -> Result<FullAssetInfo, Error> {
+    async fn asset_info(&self, asset_id: &AssetId) -> Result<LocalAssetInfo, Error> {
         self.load(asset_id.to_owned()).await.map_err(Error::from)
     }
 }
@@ -41,8 +48,8 @@ impl CachedLoader<AssetId, Decimals> for RemoteGateway {
     async fn load_fn(&mut self, keys: &[AssetId]) -> Result<Vec<Decimals>, Self::Error> {
         let mut result = vec![];
         for asset_id in keys {
-            let asset = self._asset(asset_id).await?;
-            result.push(asset.precision as u8)
+            let asset = self.asset_info(asset_id).await?;
+            result.push(asset.decimals)
         }
         Ok(result)
     }
@@ -53,12 +60,12 @@ impl CachedLoader<AssetId, Decimals> for RemoteGateway {
 }
 
 #[async_trait]
-impl CachedLoader<AssetId, FullAssetInfo> for RemoteGateway {
-    type Cache = TimedCache<AssetId, FullAssetInfo>;
+impl CachedLoader<AssetId, LocalAssetInfo> for RemoteGateway {
+    type Cache = TimedCache<AssetId, LocalAssetInfo>;
 
     type Error = Error;
 
-    async fn load_fn(&mut self, keys: &[AssetId]) -> Result<Vec<FullAssetInfo>, Self::Error> {
+    async fn load_fn(&mut self, keys: &[AssetId]) -> Result<Vec<LocalAssetInfo>, Self::Error> {
         let mut result = vec![];
         for asset_id in keys {
             let mut asset = self
@@ -66,7 +73,10 @@ impl CachedLoader<AssetId, FullAssetInfo> for RemoteGateway {
                 .get([asset_id.encoded()], None, OutputFormat::Full, false)
                 .await?;
             if let Some(AssetInfo::Full(a)) = asset.data.remove(0).data {
-                result.push(a)
+                result.push(LocalAssetInfo {
+                    ticker: a.ticker,
+                    decimals: a.precision as u8,
+                })
             } else {
                 unreachable!("Full info expected")
             }
