@@ -1,7 +1,7 @@
 use chrono::Duration;
 
-pub fn exponential(initial_interval: &Duration, multiplier: u8, attempts_count: u8) -> Duration {
-    *initial_interval * multiplier.pow(attempts_count as u32) as i32
+pub fn exponential(initial_interval: &Duration, multiplier: f32, attempts_count: u8) -> Duration {
+    *initial_interval * multiplier.powf(attempts_count as f32) as i32
 }
 
 #[cfg(test)]
@@ -11,7 +11,7 @@ mod tests {
         use crate::backoff::exponential;
         use chrono::Duration;
 
-        const MULTIPLIER_TWO: u8 = 2;
+        const MULTIPLIER_TWO: f32 = 2.0;
 
         #[test]
         pub fn zero() {

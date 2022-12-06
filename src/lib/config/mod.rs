@@ -2,9 +2,8 @@ pub mod postgres;
 pub mod sender;
 
 use crate::error::Error;
-use serde::Deserialize;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Config {
     pub postgres: postgres::Config,
     pub sender: sender::Config,

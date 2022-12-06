@@ -1,61 +1,70 @@
 use chrono::{DateTime, Utc};
 use diesel::{prelude::*, Connection, PgConnection};
 use lib::{backoff, config::Config, Error};
+use wavesexchange_log::{debug, error, info};
 
 // todo proper logging
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // todo loop
     let config = Config::load()?;
+    debug!("Start sender with config {:?}", config);
+
     let mut conn = PgConnection::establish(&config.postgres.database_url())?;
 
-    let message_to_send = postgres::dequeue(&mut conn, config.sender.send_max_attempts as i16)?;
+    loop {
+        let message_to_send = postgres::dequeue(&mut conn, config.sender.send_max_attempts as i16)?;
 
-    match message_to_send {
-        None => {
-            println!(
-                "NO MESSAGES | Sleep {:?}",
-                config.sender.empty_queue_poll_period
-            );
-            tokio::time::sleep(config.sender.empty_queue_poll_period.to_std().unwrap()).await;
-            // .unwrap() is safe, non-negativity is validated on config load (u32)
-        }
-        Some(message) => {
-            let fcm_msg = formatter::message(&config.sender.fcm_api_key, &message);
-            // todo ttl
+        match message_to_send {
+            None => {
+                debug!(
+                    "No messages, sleep for {:?}s",
+                    config.sender.empty_queue_poll_period.num_seconds()
+                );
+                tokio::time::sleep(config.sender.empty_queue_poll_period.to_std().unwrap()).await;
+                // .unwrap() is safe, non-negativity is validated on config load (u32)
+            }
+            Some(message) => {
+                let fcm_msg = formatter::message(&config.sender.fcm_api_key, &message);
+                // todo ttl
 
-            match Ok::<fcm::Message, fcm::FcmError>(fcm_msg).map(|_| ()) {
+                match Ok::<fcm::Message, fcm::FcmError>(fcm_msg).map(|_| ()) {
                 // match fcm::Client::new().send(fcm_msg).await.map(|_| ()) {
-                Ok(()) => {
-                    println!("SUCCESS | Message {}", message.uid);
-                    postgres::ack(&mut conn, message.uid)?;
-                    println!("Message {} deleted from DB", message.uid);
-                }
-                Err(err) => {
-                    eprintln!("ERROR | Message {} | {:?}", message.uid, err);
+                    Ok(()) => {
+                        info!("SENT message {}", message.uid);
+                        postgres::ack(&mut conn, message.uid)?;
+                        debug!("Message {} deleted from DB", message.uid);
+                    }
+                    Err(err) => {
+                        error!("Failed to send message {} | {:?}", message.uid, err);
 
-                    let scheduled_for = Utc::now()
-                        + backoff::exponential(
+                        let backoff_interval = backoff::exponential(
                             &config.sender.exponential_backoff_initial_interval,
                             config.sender.exponential_backoff_multiplier,
                             message.send_attempts_count,
                         );
 
-                    postgres::nack(
-                        &mut conn,
-                        message.uid,
-                        message.send_attempts_count as i16 + 1,
-                        format!("{:?}", err),
-                        scheduled_for,
-                    )?;
-                    println!("Message {} nack", message.uid);
-                }
-            };
+                        let scheduled_for = Utc::now() + backoff_interval;
+
+                        postgres::nack(
+                            &mut conn,
+                            message.uid,
+                            message.send_attempts_count as i16 + 1,
+                            format!("{:?}", err),
+                            scheduled_for,
+                        )?;
+
+                        debug!(
+                            "Message {} rescheduled for {:?} folowing backoff of {}s",
+                            message.uid,
+                            scheduled_for,
+                            backoff_interval.num_seconds(),
+                        );
+                    }
+                };
+            }
         }
     }
-
-    Ok(())
 }
 
 #[derive(Debug, Clone, Queryable)]

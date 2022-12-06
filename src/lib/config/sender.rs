@@ -10,7 +10,7 @@ use std::{
 pub struct Config {
     pub empty_queue_poll_period: Duration,
     pub exponential_backoff_initial_interval: Duration,
-    pub exponential_backoff_multiplier: u8,
+    pub exponential_backoff_multiplier: f32,
     pub send_max_attempts: u8,
     pub fcm_api_key: String,
 }
@@ -44,7 +44,7 @@ struct ConfigFlat {
     #[serde(default = "default_exponential_backoff_initial_interval_millis")]
     pub send_exponential_backoff_initial_interval_millis: u32,
     #[serde(default = "default_exponential_backoff_multiplier")]
-    pub send_exponential_backoff_multiplier: u8,
+    pub send_exponential_backoff_multiplier: f32,
     #[serde(default = "default_send_max_attempts")]
     pub send_max_attempts: u8,
     pub fcm_api_key: String,
@@ -58,10 +58,24 @@ fn default_exponential_backoff_initial_interval_millis() -> u32 {
     5000
 }
 
-fn default_exponential_backoff_multiplier() -> u8 {
-    3
+fn default_exponential_backoff_multiplier() -> f32 {
+    3.0
 }
 
 fn default_send_max_attempts() -> u8 {
     5
+}
+
+impl Debug for Config {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // Intentionally avoid printing password for security reasons
+        write!(
+            f,
+            "Sender(empty_queue_poll_period={}s; exponential_backoff_initial_interval={}s; exponential_backoff_multiplier={}; send_max_attempts={}; fcm_api_key=***)",
+            self.empty_queue_poll_period.num_seconds(),
+            self.exponential_backoff_initial_interval.num_seconds(),
+            self.exponential_backoff_multiplier,
+            self.send_max_attempts
+        )
+    }
 }
