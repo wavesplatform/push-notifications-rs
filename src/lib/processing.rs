@@ -3,6 +3,7 @@ use crate::{
     error::Error,
     localization,
     message::{self, LocalizedMessage, Message, PreparedMessage},
+    model::{AsBase58String, AssetId},
     stream::{Event, OrderExecution},
     subscription::{self, Subscription, SubscriptionMode, Topic},
     timestamp::WithCurrentTimestamp,
@@ -92,8 +93,8 @@ impl MessagePump {
                 Message::OrderExecuted {
                     order_type: *order_type,
                     side: *side,
-                    amount_asset_ticker: self.assets.ticker(amount_asset_id).await?,
-                    price_asset_ticker: self.assets.ticker(price_asset_id).await?,
+                    amount_asset_ticker: self.asset_ticker(amount_asset_id).await?,
+                    price_asset_ticker: self.asset_ticker(price_asset_id).await?,
                     execution: *execution,
                 }
             }
@@ -123,14 +124,20 @@ impl MessagePump {
                     .await?;
                 let price_threshold = apply_decimals(price_threshold.value(), decimals);
                 Message::PriceThresholdReached {
-                    amount_asset_ticker: self.assets.ticker(amount_asset_id).await?,
-                    price_asset_ticker: self.assets.ticker(price_asset_id).await?,
+                    amount_asset_ticker: self.asset_ticker(amount_asset_id).await?,
+                    price_asset_ticker: self.asset_ticker(price_asset_id).await?,
                     threshold: price_threshold,
                 }
             }
             (_, _) => unreachable!("unrecognized combination of subscription and event"),
         };
         Ok(res)
+    }
+
+    async fn asset_ticker(&self, asset_id: &AssetId) -> Result<String, Error> {
+        let maybe_ticker = self.assets.ticker(asset_id).await?;
+        let ticker = maybe_ticker.unwrap_or_else(|| asset_id.as_base58_string());
+        Ok(ticker)
     }
 }
 

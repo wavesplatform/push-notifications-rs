@@ -1,17 +1,17 @@
 use crate::error::Error;
-use crate::model::{AssetId, ByteString};
+use crate::model::{AsBase58String, AssetId};
 use wavesexchange_apis::{
     assets::dto::{AssetInfo, OutputFormat},
     AssetsService, HttpClient,
 };
 use wavesexchange_loaders::{CachedLoader, Loader as _, TimedCache, UnboundCache};
 
-type Ticker = Option<String>;
+type Ticker = String;
 type Decimals = u8;
 
 #[derive(Debug, Clone)]
 struct LocalAssetInfo {
-    ticker: Ticker,
+    ticker: Option<Ticker>,
     decimals: Decimals,
 }
 
@@ -26,7 +26,7 @@ impl RemoteGateway {
         RemoteGateway { assets_client }
     }
 
-    pub async fn ticker(&self, asset_id: &AssetId) -> Result<Ticker, Error> {
+    pub async fn ticker(&self, asset_id: &AssetId) -> Result<Option<Ticker>, Error> {
         self.asset_info(asset_id).await.map(|a| a.ticker)
     }
 
@@ -68,9 +68,10 @@ impl CachedLoader<AssetId, LocalAssetInfo> for RemoteGateway {
     async fn load_fn(&mut self, keys: &[AssetId]) -> Result<Vec<LocalAssetInfo>, Self::Error> {
         let mut result = vec![];
         for asset_id in keys {
+            let asset_id = asset_id.as_base58_string();
             let mut asset = self
                 .assets_client
-                .get([asset_id.encoded()], None, OutputFormat::Full, false)
+                .get([asset_id], None, OutputFormat::Full, false)
                 .await?;
             if let Some(AssetInfo::Full(a)) = asset.data.remove(0).data {
                 result.push(LocalAssetInfo {
