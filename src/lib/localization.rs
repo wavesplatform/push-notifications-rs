@@ -95,9 +95,8 @@ pub struct Repo {
 }
 
 impl Repo {
-    pub async fn new(lokalise_sdk_token: &str) -> Result<Self, Error> {
-        let auth_header =
-            HashMap::from([("X-Api-Token".to_string(), lokalise_sdk_token.to_string())]);
+    pub async fn new(lokalise_sdk_token: impl Into<String>) -> Result<Self, Error> {
+        let auth_header = HashMap::from([("X-Api-Token".to_string(), lokalise_sdk_token.into())]);
 
         let lokalise_client = HttpClient::<()>::builder()
             .with_base_url("https://api.lokalise.co/api2")
