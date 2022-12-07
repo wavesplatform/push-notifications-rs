@@ -40,14 +40,14 @@ impl From<ConfigFlat> for Config {
 #[derive(Deserialize)]
 struct ConfigFlat {
     #[serde(default = "default_empty_queue_poll_period")]
-    pub send_empty_queue_poll_period_millis: u32,
+    send_empty_queue_poll_period_millis: u32,
     #[serde(default = "default_exponential_backoff_initial_interval_millis")]
-    pub send_exponential_backoff_initial_interval_millis: u32,
+    send_exponential_backoff_initial_interval_millis: u32,
     #[serde(default = "default_exponential_backoff_multiplier")]
-    pub send_exponential_backoff_multiplier: f32,
+    send_exponential_backoff_multiplier: f32,
     #[serde(default = "default_send_max_attempts")]
-    pub send_max_attempts: u8,
-    pub fcm_api_key: String,
+    send_max_attempts: u8,
+    fcm_api_key: String,
 }
 
 fn default_empty_queue_poll_period() -> u32 {
