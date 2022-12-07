@@ -65,7 +65,7 @@ impl MessagePump {
     }
 
     async fn process_event(&self, event: Event, conn: &mut AsyncPgConnection) -> Result<(), Error> {
-        let subscriptions = self.subscriptions.matching(&event, conn).await;
+        let subscriptions = self.subscriptions.matching(&event, conn).await?;
         for subscription in subscriptions {
             let is_oneshot = subscription.mode == SubscriptionMode::Once;
             let msg = self.make_message(&event, &subscription.topic).await?;
@@ -83,7 +83,9 @@ impl MessagePump {
                 self.messages.enqueue(msg_with_timestamp, conn).await?;
             }
             if is_oneshot {
-                self.subscriptions.cancel(subscription, conn).await;
+                self.subscriptions
+                    .complete_oneshot(subscription, conn)
+                    .await?;
             }
         }
         Ok(())
