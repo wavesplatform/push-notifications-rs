@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use warp::reject::Reject;
 use wavesexchange_loaders::LoaderError;
 
 #[derive(Debug, thiserror::Error)]
@@ -48,3 +49,5 @@ impl From<LoaderError<Error>> for Error {
         }
     }
 }
+
+impl Reject for Error {}
