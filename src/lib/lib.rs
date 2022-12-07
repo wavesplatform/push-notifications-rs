@@ -28,8 +28,8 @@ mod timestamp {
     use chrono::{DateTime, Utc};
 
     pub struct WithTimestamp<T> {
-        timestamp: DateTime<Utc>,
-        value: T,
+        pub timestamp: DateTime<Utc>,
+        pub value: T,
     }
 
     pub trait WithCurrentTimestamp<T> {
