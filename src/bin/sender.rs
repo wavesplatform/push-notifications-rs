@@ -1,62 +1,70 @@
 use chrono::{DateTime, Utc};
 use diesel::{prelude::*, Connection, PgConnection};
-use lib::{config::Config, Error};
-use std::time::Duration;
+use lib::{backoff, config::Config, Error};
+use wavesexchange_log::{debug, error, info};
 
 // todo proper logging
 
-const EMPTY_QUEUE_POLL_PERIOD: Duration = Duration::from_secs(5);
-
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // todo loop
     let config = Config::load()?;
+    debug!("Sender started with config {:?}", config);
+
     let mut conn = PgConnection::establish(&config.postgres.database_url())?;
 
-    // get message from queue
-    let message_to_send = postgres::dequeue(&mut conn)?;
+    loop {
+        let message_to_send = postgres::dequeue(&mut conn, config.sender.send_max_attempts as i16)?;
 
-    match message_to_send {
-        None => {
-            println!("NO MESSAGES | Sleep {:?}", EMPTY_QUEUE_POLL_PERIOD);
-            tokio::time::sleep(EMPTY_QUEUE_POLL_PERIOD).await;
-        }
-        Some(message) => {
-            // todo check eligibility to send using exponential backoff
-            // for now, no retries. 1 attempt per message
-            if message.send_attempts_count > 0 {
-                println!("SKIP | Message {}", message.uid);
-                postgres::skip(&mut conn, message.uid, Utc::now())?;
-            } else {
-                // message is eligible for sending
-                let fcm_msg = formatter::message(&config.fcm_api_key, &message);
-
+        match message_to_send {
+            None => {
+                debug!(
+                    "No messages, sleep for {:?}s",
+                    config.sender.empty_queue_poll_period.num_seconds()
+                );
+                tokio::time::sleep(config.sender.empty_queue_poll_period.to_std().unwrap()).await;
+                // .unwrap() is safe, non-negativity is validated on config load (u32)
+            }
+            Some(message) => {
+                let fcm_msg = formatter::message(&config.sender.fcm_api_key, &message);
                 // todo ttl
 
                 match Ok::<fcm::Message, fcm::FcmError>(fcm_msg).map(|_| ()) {
-                    // match fcm::Client::new().send(fcm_msg).await.map(|_| ()) {
+                // match fcm::Client::new().send(fcm_msg).await.map(|_| ()) {
                     Ok(()) => {
-                        println!("SUCCESS | Message {}", message.uid);
+                        info!("SENT message {}", message.uid);
                         postgres::ack(&mut conn, message.uid)?;
-                        println!("Message {} deleted from DB", message.uid);
+                        debug!("Message {} deleted from DB", message.uid);
                     }
                     Err(err) => {
-                        eprintln!("ERROR | Message {} | {:?}", message.uid, err);
+                        error!("Failed to send message {} | {:?}", message.uid, err);
+
+                        let backoff_interval = backoff::exponential(
+                            &config.sender.exponential_backoff_initial_interval,
+                            config.sender.exponential_backoff_multiplier,
+                            message.send_attempts_count,
+                        );
+
+                        let scheduled_for = Utc::now() + backoff_interval;
+
                         postgres::nack(
                             &mut conn,
                             message.uid,
-                            message.send_attempts_count + 1,
+                            message.send_attempts_count as i16 + 1,
                             format!("{:?}", err),
-                            Utc::now(),
+                            scheduled_for,
                         )?;
-                        println!("Message {} nack", message.uid);
+
+                        debug!(
+                            "Message {} rescheduled for {:?} folowing backoff of {}s",
+                            message.uid,
+                            scheduled_for,
+                            backoff_interval.num_seconds(),
+                        );
                     }
                 };
             }
         }
     }
-
-    Ok(())
 }
 
 #[derive(Debug, Clone, Queryable)]
@@ -65,7 +73,8 @@ pub struct MessageToSend {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub send_error: Option<String>,
-    pub send_attempts_count: i32,
+    #[diesel(deserialize_as = i16)]
+    pub send_attempts_count: u8,
     pub notification_title: String,
     pub notification_body: String,
     pub collapse_key: Option<String>,
@@ -82,31 +91,18 @@ mod postgres {
         Error,
     };
 
-    /// Sets message updated_at.
-    /// Use to send message to the end of the queue with no action
-    pub fn skip(
-        conn: &mut PgConnection,
-        message_uid: i32,
-        new_updated_at: DateTime<Utc>,
-    ) -> Result<(), Error> {
-        diesel::update(messages::table)
-            .filter(messages::uid.eq(message_uid))
-            .set(messages::updated_at.eq(new_updated_at))
-            .execute(conn)?;
-        Ok(())
-    }
-
+    // todo separate business logic from DB I/O
     pub fn nack(
         conn: &mut PgConnection,
         message_uid: i32,
-        new_send_attempts_count: i32,
+        new_send_attempts_count: i16,
         new_send_error: String,
-        new_updated_at: DateTime<Utc>,
+        new_scheduled_for: DateTime<Utc>,
     ) -> Result<(), Error> {
         diesel::update(messages::table)
             .filter(messages::uid.eq(message_uid))
             .set((
-                messages::updated_at.eq(new_updated_at),
+                messages::scheduled_for.eq(new_scheduled_for),
                 messages::send_attempts_count.eq(new_send_attempts_count),
                 messages::send_error.eq(new_send_error),
             ))
@@ -119,13 +115,16 @@ mod postgres {
         Ok(())
     }
 
-    pub fn dequeue(conn: &mut PgConnection) -> Result<Option<MessageToSend>, Error> {
+    pub fn dequeue(
+        conn: &mut PgConnection,
+        max_send_attempts: i16,
+    ) -> Result<Option<MessageToSend>, Error> {
         Ok(messages::table
             .inner_join(devices::table.on(messages::device_uid.eq(devices::uid)))
             .select((
                 messages::uid,
                 messages::created_at,
-                messages::updated_at,
+                messages::scheduled_for,
                 messages::send_error,
                 messages::send_attempts_count,
                 messages::notification_title,
@@ -133,8 +132,9 @@ mod postgres {
                 messages::collapse_key,
                 devices::fcm_uid,
             ))
-            .filter(messages::send_attempts_count.lt(1)) // todo retries
-            .order(messages::updated_at)
+            .filter(messages::send_attempts_count.lt(max_send_attempts))
+            .filter(messages::scheduled_for.lt(Utc::now()))
+            .order(messages::scheduled_for)
             .first(conn)
             .optional()?)
     }

@@ -39,14 +39,15 @@ create index on topics_price_threshold(amount_asset_id, price_asset_id, price_th
 CREATE TABLE IF NOT EXISTS messages (
     uid serial not null primary key,
     created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now(), -- creation or last send attempt
-    send_attempts_count integer not null default 0,
+    scheduled_for timestamptz not null default now(),
+    send_attempts_count smallint not null default 0,
     send_error varchar,
     device_uid integer not null,
     notification_title varchar not null,
     notification_body varchar not null,
     data jsonb,
     collapse_key varchar,
-    foreign key (device_uid) references devices(uid)
+    foreign key (device_uid) references devices(uid),
+    constraint send_attempts_count_u8 check (send_attempts_count >= 0 and send_attempts_count < 256)
 );
 create index on messages(device_uid);
