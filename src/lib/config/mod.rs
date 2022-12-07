@@ -1,3 +1,4 @@
+pub mod lokalise;
 pub mod postgres;
 pub mod sender;
 
@@ -7,6 +8,7 @@ use crate::error::Error;
 pub struct Config {
     pub postgres: postgres::Config,
     pub sender: sender::Config,
+    pub lokalise: lokalise::Config,
 }
 
 impl Config {
@@ -14,6 +16,7 @@ impl Config {
         Ok(Self {
             postgres: postgres::Config::load()?,
             sender: sender::Config::load()?,
+            lokalise: lokalise::Config::load()?,
         })
     }
 }
