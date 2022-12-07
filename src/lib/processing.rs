@@ -6,7 +6,6 @@ use crate::{
     model::{AsBase58String, AssetId, Lang},
     stream::{Event, OrderExecution},
     subscription::{self, Subscription, SubscriptionMode, Topic},
-    timestamp::WithCurrentTimestamp,
 };
 use diesel_async::{AsyncConnection, AsyncPgConnection};
 use futures::FutureExt;
@@ -79,8 +78,7 @@ impl MessagePump {
                     data: None,
                     collapse_key: None,
                 };
-                let msg_with_timestamp = prepared_message.with_current_timestamp();
-                self.messages.enqueue(msg_with_timestamp, conn).await?;
+                self.messages.enqueue(prepared_message, conn).await?;
             }
             if is_oneshot {
                 self.subscriptions

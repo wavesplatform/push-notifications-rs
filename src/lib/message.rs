@@ -6,7 +6,6 @@ use crate::{
     error::Error,
     schema::messages,
     stream::{OrderExecution, OrderSide, OrderType},
-    timestamp::WithTimestamp,
 };
 
 pub enum Message {
@@ -41,15 +40,15 @@ pub struct Queue {}
 impl Queue {
     pub async fn enqueue(
         &self,
-        message: WithTimestamp<PreparedMessage>,
+        message: PreparedMessage,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         let values = (
-            messages::device_uid.eq(message.value.device.device_uid),
-            messages::notification_title.eq(message.value.message.notification_title),
-            messages::notification_body.eq(message.value.message.notification_body),
+            messages::device_uid.eq(message.device.device_uid),
+            messages::notification_title.eq(message.message.notification_title),
+            messages::notification_body.eq(message.message.notification_body),
             //messages::data.eq(message.value.data), //TODO optional data
-            messages::collapse_key.eq(message.value.collapse_key),
+            messages::collapse_key.eq(message.collapse_key),
         );
         let num_rows = diesel::insert_into(messages::table)
             .values(values)
