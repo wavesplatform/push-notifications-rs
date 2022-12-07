@@ -1,4 +1,4 @@
-use diesel::{ExpressionMethods,};
+use diesel::ExpressionMethods;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use crate::{

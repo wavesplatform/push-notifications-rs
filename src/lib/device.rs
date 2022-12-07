@@ -24,26 +24,19 @@ impl Repo {
         address: &Address,
         conn: &mut AsyncPgConnection,
     ) -> Result<Vec<Device>, Error> {
-        let address = address.as_base58_string();
-
         let rows = devices::table
-            .select((
-                devices::uid,
-                devices::fcm_uid,
-                devices::subscriber_address,
-                devices::language,
-            ))
-            .filter(devices::subscriber_address.eq(address))
+            .select((devices::uid, devices::fcm_uid, devices::language))
+            .filter(devices::subscriber_address.eq(address.as_base58_string()))
             .order(devices::uid)
-            .load::<(i32, String, String, String)>(conn)
+            .load::<(i32, String, String)>(conn)
             .await?;
 
         let devices = rows
             .into_iter()
-            .map(|(device_uid, fcm_uid, address, lang)| Device {
+            .map(|(device_uid, fcm_uid, lang)| Device {
                 device_uid,
                 fcm_uid,
-                address: Address::from_string(&address).expect("address in db"),
+                address: address.clone(),
                 lang,
             })
             .collect();
