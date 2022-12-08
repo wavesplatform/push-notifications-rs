@@ -27,6 +27,9 @@ diesel-async = { version = "0.1", features = ["postgres"] }
 anyhow = "1.0"
 itertools = "0.10"
 fcm = "0.9"
+prost = { version = "0.8", features = ["no-recursion-limit"] }
+tonic = "0.5"
+waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", tag = "v1.4.3" }
 
 [lib]
 name = "lib"

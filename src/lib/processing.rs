@@ -12,7 +12,7 @@ use futures::FutureExt;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
-pub struct EventWithResult {
+pub struct EventWithFeedback {
     pub event: Event,
     pub result_tx: oneshot::Sender<Result<(), Error>>,
 }
@@ -44,11 +44,11 @@ impl MessagePump {
 
     pub async fn run_event_loop(
         self: Arc<Self>,
-        mut events: mpsc::Receiver<EventWithResult>,
+        mut events: mpsc::Receiver<EventWithFeedback>,
         mut conn: AsyncPgConnection,
     ) {
         while let Some(event) = events.recv().await {
-            let EventWithResult { event, result_tx } = event;
+            let EventWithFeedback { event, result_tx } = event;
             let this = self.clone();
             let res = conn
                 .transaction(|conn| {

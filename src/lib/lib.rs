@@ -14,6 +14,7 @@ pub mod localization;
 pub mod message;
 pub mod processing;
 pub mod schema;
+pub mod source;
 pub mod subscription;
 
 mod error;
