@@ -18,3 +18,9 @@ impl AsBase58String for AssetId {
         self.encoded()
     }
 }
+
+impl AsBase58String for Address {
+    fn as_base58_string(&self) -> String {
+        self.encoded()
+    }
+}
