@@ -16,14 +16,12 @@ struct ConfigFlat {
     port: u16,
     #[serde(default = "default_metrics_port")]
     metrics_port: u16,
-    fcm_api_key: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct Config {
     pub port: u16,
     pub metrics_port: u16,
-    pub fcm_api_key: String,
 }
 
 impl Config {
@@ -33,7 +31,6 @@ impl Config {
         Ok(Config {
             port: config_flat.port,
             metrics_port: config_flat.metrics_port,
-            fcm_api_key: config_flat.fcm_api_key,
         })
     }
 }
