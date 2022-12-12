@@ -51,14 +51,14 @@ pub async fn start(port: u16, metrics_port: u16, repos: Repos, conn: AsyncPgConn
         .and(with_conn.clone())
         .and_then(controllers::unregister_device);
 
-    let device_edit = warp::patch()
+    let device_update = warp::patch()
         .and(warp::path!("device"))
         .and(fcm_uid)
         .and(user_addr)
         .and(with_repos.clone())
         .and(with_conn.clone())
         .and(warp::body::json::<dto::UpdateDevice>())
-        .and_then(controllers::edit_device);
+        .and_then(controllers::update_device);
 
     let device_register = warp::put()
         .and(warp::path!("device"))
@@ -90,7 +90,7 @@ pub async fn start(port: u16, metrics_port: u16, repos: Repos, conn: AsyncPgConn
     info!("Starting push-notifications API server at 0.0.0.0:{}", port);
 
     let routes = device_unregister
-        .or(device_edit)
+        .or(device_update)
         .or(device_register)
         .or(topic_subscribe)
         .or(topic_unsubscribe)
@@ -175,7 +175,7 @@ mod controllers {
             .map_err(Rejection::from)
     }
 
-    pub async fn edit_device(
+    pub async fn update_device(
         fcm_uid: FcmUid,
         addr: String,
         repos: Repos,
