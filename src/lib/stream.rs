@@ -1,4 +1,4 @@
-use crate::model::{Amount, AssetId};
+use crate::model::{Amount, Asset};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum OrderType {
@@ -21,6 +21,12 @@ pub enum OrderExecution {
 /// Raw price value with unknown decimals
 pub type RawPrice = u64;
 
+/// Price as integer together with corresponding decimals
+pub struct PriceWithDecimals {
+    pub price: u64,
+    pub decimals: u8,
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PriceOHLC {
     open: RawPrice,
@@ -33,24 +39,50 @@ pub enum Event {
     OrderExecuted {
         order_type: OrderType,
         side: OrderSide,
-        amount_asset_id: AssetId,
-        price_asset_id: AssetId,
+        amount_asset: Asset,
+        price_asset: Asset,
         execution: OrderExecution,
     },
     PriceChanged {
-        amount_asset_id: AssetId,
-        price_asset_id: AssetId,
+        amount_asset: Asset,
+        price_asset: Asset,
         current_price: PriceOHLC,
         previous_price: PriceOHLC,
     },
 }
 
 mod impls {
-    use super::{PriceOHLC, RawPrice};
+    use super::{PriceOHLC, PriceWithDecimals, RawPrice};
     use itertools::Itertools;
     use std::ops::Add;
 
+    impl PriceWithDecimals {
+        pub fn value(&self) -> f64 {
+            let value = self.price as f64;
+            let divisor = 10_f64.powi(self.decimals as i32);
+            value / divisor
+        }
+    }
+
+    #[test]
+    fn test_price_decimals() {
+        let p = |price, decimals| PriceWithDecimals { price, decimals };
+        assert_eq!(p(12345678, 1).value(), 1234567.8);
+        assert_eq!(p(12345678, 2).value(), 123456.78);
+        assert_eq!(p(12345678, 3).value(), 12345.678);
+        assert_eq!(p(12345678, 4).value(), 1234.5678);
+    }
+
     impl PriceOHLC {
+        pub fn from_single_value(price: RawPrice) -> Self {
+            PriceOHLC {
+                open: price,
+                close: price,
+                low: price,
+                high: price,
+            }
+        }
+
         pub fn low_high(&self) -> (RawPrice, RawPrice) {
             debug_assert!(self.low <= self.high);
             (self.low, self.high)

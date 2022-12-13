@@ -4,7 +4,7 @@ use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use crate::{
     error::Error,
-    model::{Address, Amount, AsBase58String, AssetId},
+    model::{Address, AsBase58String, Asset, AssetAmount},
     schema::{subscriptions, topics_price_threshold},
     stream::{Event, RawPrice},
 };
@@ -24,12 +24,12 @@ pub enum SubscriptionMode {
 
 pub enum Topic {
     OrderFulfilled {
-        amount_asset: Option<AssetId>,
-        price_asset: Option<AssetId>,
+        amount_asset: Asset,
+        price_asset: Asset,
     },
     PriceThreshold {
-        amount_asset: Option<AssetId>,
-        price_threshold: Amount,
+        amount_asset: Asset,
+        price_threshold: AssetAmount,
     },
 }
 
@@ -63,18 +63,16 @@ impl Repo {
                 todo!("impl find matching subscriptions for OrderExecuted event")
             }
             Event::PriceChanged {
-                amount_asset_id,
-                price_asset_id,
+                amount_asset,
+                price_asset,
                 current_price,
                 previous_price,
             } => {
-                let amount_asset_id = amount_asset_id.as_base58_string();
-                let price_asset_id = price_asset_id.as_base58_string();
                 let price = previous_price + current_price;
                 let (price_low, price_high) = price.low_high();
                 self.matching_price_subscriptions(
-                    amount_asset_id,
-                    price_asset_id,
+                    amount_asset.id(),
+                    price_asset.id(),
                     price_low,
                     price_high,
                     conn,

@@ -24,3 +24,26 @@ impl AsBase58String for Address {
         self.encoded()
     }
 }
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Asset {
+    Waves,
+    AssetId(AssetId),
+}
+
+impl Asset {
+    pub const WAVES_ASSET_ID: &str = "WAVES";
+
+    pub fn id(&self) -> String {
+        match self {
+            Asset::Waves => Self::WAVES_ASSET_ID.to_string(),
+            Asset::AssetId(asset_id) => asset_id.as_base58_string(),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct AssetAmount {
+    pub asset: Asset,
+    pub value: u64,
+}
