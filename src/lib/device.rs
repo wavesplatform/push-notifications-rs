@@ -52,32 +52,19 @@ impl Repo {
         address: &Address,
         fcm_uid: FcmUid,
         lang: &str,
-        tz: FixedOffset,
+        tz: i32,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         conn.transaction(move |conn| {
             let address = address.as_base58_string();
-            let timestamptz = Utc::now().with_timezone(&tz);
             let lang = lang.to_string();
 
             async move {
-                let subscriber = (
-                    subscribers::created_at.eq(timestamptz),
-                    subscribers::updated_at.eq(timestamptz),
-                    subscribers::address.eq(address.clone()),
-                );
-
-                diesel::insert_into(subscribers::table)
-                    .values(subscriber)
-                    .execute(conn)
-                    .await?;
-
                 let device = (
-                    devices::created_at.eq(timestamptz),
-                    devices::updated_at.eq(timestamptz),
                     devices::fcm_uid.eq(fcm_uid),
                     devices::subscriber_address.eq(address),
                     devices::language.eq(lang),
+                    devices::utc_offset_seconds.eq(tz),
                 );
 
                 diesel::insert_into(devices::table)
@@ -144,7 +131,7 @@ impl Repo {
         address: &Address,
         fcm_uid: FcmUid,
         lang: Option<String>,
-        tz: Option<FixedOffset>,
+        tz: Option<i32>,
         new_fcm_uid: Option<FcmUid>,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
@@ -153,7 +140,6 @@ impl Repo {
             let lang = lang.map(|l| l.to_string());
 
             async move {
-                // refactor asap
                 let updater = diesel::update(
                     devices::table
                         .filter(devices::fcm_uid.eq(fcm_uid.clone()))
@@ -179,33 +165,11 @@ impl Repo {
                 }
 
                 if let Some(tz) = tz {
-                    let (created_at, updated_at) = devices::table
-                        .select((devices::created_at, devices::updated_at))
-                        .filter(devices::fcm_uid.eq(fcm_uid))
-                        .filter(devices::subscriber_address.eq(address.clone()))
-                        .get_result::<(DateTime<Utc>, DateTime<Utc>)>(conn)
-                        .await?;
-
-                    let (created_at, updated_at) =
-                        (created_at.with_timezone(&tz), updated_at.with_timezone(&tz));
-
                     updater
-                        .set((
-                            devices::created_at.eq(created_at),
-                            devices::updated_at.eq(updated_at),
-                        ))
+                        .clone()
+                        .set(devices::utc_offset_seconds.eq(tz))
                         .execute(conn)
                         .await?;
-
-                    diesel::update(
-                        subscribers::table.filter(subscribers::address.eq(address.clone())),
-                    )
-                    .set((
-                        subscribers::created_at.eq(created_at),
-                        subscribers::updated_at.eq(updated_at),
-                    ))
-                    .execute(conn)
-                    .await?;
                 }
 
                 Ok(())

@@ -154,6 +154,7 @@ impl Repo {
         &self,
         address: &Address,
         topics: Vec<String>,
+        topic_type: SubscriptionMode,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         let values = topics
@@ -162,7 +163,7 @@ impl Repo {
                 (
                     subscriptions::subscriber_address.eq(address.as_base58_string()),
                     subscriptions::topic.eq(topic),
-                    subscriptions::topic_type.eq(1), // todo: how to determine topic type?
+                    subscriptions::topic_type.eq(topic_type as i32),
                 )
             })
             .collect::<Vec<_>>();

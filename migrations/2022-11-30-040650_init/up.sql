@@ -11,6 +11,9 @@ CREATE TABLE IF NOT EXISTS devices (
     fcm_uid varchar NOT NULL,
     subscriber_address varchar NOT NULL,
     language varchar NOT NULL,
+    utc_offset_seconds integer NOT NULL,
+    CHECK (utc_offset_seconds >= -43200 AND utc_offset_seconds <= 50400),
+    
     primary key (subscriber_address, fcm_uid),
     foreign key (subscriber_address) references subscribers(address)
 );

@@ -1,12 +1,11 @@
-use diesel_async::{AsyncConnection, AsyncPgConnection};
-use lib::{api, config::Config, device, subscription, Error};
+use lib::{api, config::Config, db, device, subscription, Error};
 use wavesexchange_log::info;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let config = Config::load()?;
 
-    let conn = AsyncPgConnection::establish(&config.postgres.database_url()).await?;
+    let pool = db::async_pool(&config.postgres).await?;
 
     let repos = api::Repos {
         device: device::Repo {},
@@ -18,7 +17,7 @@ async fn main() -> Result<(), Error> {
         config
     );
 
-    api::start(config.api.port, config.api.metrics_port, repos, conn).await;
+    api::start(config.api.port, config.api.metrics_port, repos, pool).await;
 
     Ok(())
 }
