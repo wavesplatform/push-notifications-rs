@@ -7,7 +7,7 @@ COPY Cargo.* ./
 COPY ./src ./src
 COPY ./migrations ./migrations
 
-RUN cargo install --path .
+RUN cargo install -j4 --path .
 
 
 FROM debian:11 as runtime
