@@ -1797,6 +1797,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bs58",
  "chrono",
  "diesel",
  "diesel-async",

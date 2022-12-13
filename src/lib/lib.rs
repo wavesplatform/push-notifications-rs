@@ -12,6 +12,7 @@ pub mod config;
 pub mod device;
 pub mod localization;
 pub mod message;
+pub mod model;
 pub mod processing;
 pub mod schema;
 pub mod source;
@@ -19,7 +20,6 @@ pub mod subscription;
 
 mod error;
 mod fcm;
-mod model;
 mod stream;
 
 pub use error::Error;

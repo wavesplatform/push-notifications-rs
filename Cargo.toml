@@ -30,6 +30,7 @@ fcm = "0.9"
 prost = { version = "0.8", features = ["no-recursion-limit"] }
 tonic = "0.5"
 waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", tag = "v1.4.3" }
+bs58 = "0.4"
 
 [lib]
 name = "lib"
