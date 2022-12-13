@@ -7,6 +7,8 @@
 | Env variable | Required | Default | Note                     |
 | ------------ | -------- | ------- | ------------------------ |
 | RUST_LOG     | NO       | INFO    |                          |
+| PORT         | NO       | 8080    |                          |
+| METRICS_PORT | NO       | 9090    |                          |
 | PGHOST       | YES      |         |                          |
 | PGPORT       | NO       | 5432    |                          |
 | PGDATABASE   | YES      |         |                          |
