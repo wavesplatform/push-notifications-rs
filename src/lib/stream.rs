@@ -1,4 +1,4 @@
-use crate::model::{Amount, Asset};
+use crate::model::{Amount, AssetPair};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum OrderType {
@@ -39,13 +39,11 @@ pub enum Event {
     OrderExecuted {
         order_type: OrderType,
         side: OrderSide,
-        amount_asset: Asset,
-        price_asset: Asset,
+        asset_pair: AssetPair,
         execution: OrderExecution,
     },
     PriceChanged {
-        amount_asset: Asset,
-        price_asset: Asset,
+        asset_pair: AssetPair,
         current_price: PriceOHLC,
         previous_price: PriceOHLC,
     },

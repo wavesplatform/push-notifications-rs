@@ -63,16 +63,15 @@ impl Repo {
                 todo!("impl find matching subscriptions for OrderExecuted event")
             }
             Event::PriceChanged {
-                amount_asset,
-                price_asset,
+                asset_pair,
                 current_price,
                 previous_price,
             } => {
                 let price = previous_price + current_price;
                 let (price_low, price_high) = price.low_high();
                 self.matching_price_subscriptions(
-                    amount_asset.id(),
-                    price_asset.id(),
+                    asset_pair.amount_asset.id(),
+                    asset_pair.price_asset.id(),
                     price_low,
                     price_high,
                     conn,

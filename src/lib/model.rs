@@ -64,3 +64,15 @@ pub struct AssetAmount {
     pub asset: Asset,
     pub value: u64,
 }
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct AssetPair {
+    pub amount_asset: Asset,
+    pub price_asset: Asset,
+}
+
+impl AssetPair {
+    pub fn assets_as_ref(&self) -> (&Asset, &Asset) {
+        (&self.amount_asset, &self.price_asset)
+    }
+}

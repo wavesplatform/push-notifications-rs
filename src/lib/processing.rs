@@ -95,8 +95,7 @@ impl MessagePump {
                 Event::OrderExecuted {
                     order_type,
                     side,
-                    amount_asset: event_amount_asset,
-                    price_asset: event_price_asset,
+                    asset_pair: event_assets,
                     execution,
                 },
                 Topic::OrderFulfilled {
@@ -104,9 +103,9 @@ impl MessagePump {
                     price_asset: topic_price_asset,
                 },
             ) => {
-                debug_assert_eq!(event_amount_asset, topic_amount_asset);
-                debug_assert_eq!(event_price_asset, topic_price_asset);
-                let (amount_asset, price_asset) = (event_amount_asset, event_price_asset);
+                debug_assert_eq!(event_assets.amount_asset, *topic_amount_asset);
+                debug_assert_eq!(event_assets.price_asset, *topic_price_asset);
+                let (amount_asset, price_asset) = event_assets.assets_as_ref();
                 Message::OrderExecuted {
                     order_type: *order_type,
                     side: *side,
@@ -117,8 +116,7 @@ impl MessagePump {
             }
             (
                 Event::PriceChanged {
-                    amount_asset: event_amount_asset,
-                    price_asset: event_price_asset,
+                    asset_pair: event_assets,
                     current_price,
                     previous_price,
                 },
@@ -127,12 +125,12 @@ impl MessagePump {
                     price_threshold,
                 },
             ) => {
-                debug_assert_eq!(event_amount_asset, topic_amount_asset);
-                debug_assert_eq!(event_price_asset, &price_threshold.asset);
+                debug_assert_eq!(event_assets.amount_asset, *topic_amount_asset);
+                debug_assert_eq!(event_assets.price_asset, price_threshold.asset);
                 debug_assert!(
                     current_price.has_crossed_threshold(previous_price, price_threshold.value)
                 );
-                let (amount_asset, price_asset) = (event_amount_asset, event_price_asset);
+                let (amount_asset, price_asset) = event_assets.assets_as_ref();
                 let decimals = self.assets.decimals(&price_threshold.asset).await?;
                 let price_threshold = PriceWithDecimals {
                     price: price_threshold.value,

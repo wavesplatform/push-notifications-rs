@@ -1,64 +1,121 @@
 //! Blockchain updates
 
 pub mod prices {
+    use std::collections::HashMap;
+
     use tokio::sync::{mpsc, oneshot};
 
-    use super::blockchain_updates::{AppendBlock, BlockchainUpdate, BlockchainUpdatesClient};
+    use super::{
+        blockchain_updates::{AppendBlock, BlockchainUpdate, BlockchainUpdatesClient},
+        data_service::load_pairs,
+    };
     use crate::{
-        model::Address,
+        asset,
+        model::{Address, AssetPair},
         processing::EventWithFeedback,
         stream::{Event, PriceOHLC, PriceWithDecimals, RawPrice},
     };
 
-    pub async fn start(
-        blockchain_updates_url: String,
-        starting_height: u32,
+    pub struct Source {
         matcher_address: Address,
-        sink: mpsc::Sender<EventWithFeedback>,
-    ) -> Result<(), anyhow::Error> {
-        let client = BlockchainUpdatesClient::connect(blockchain_updates_url).await?;
-        let mut stream = client.stream(starting_height).await?;
-        while let Some(upd) = stream.recv().await {
-            match upd {
-                BlockchainUpdate::Append(block) => {
-                    process_block(block, &matcher_address, &sink).await?
-                }
-                BlockchainUpdate::Rollback(_) => {}
-            }
-        }
-        Ok(())
+        prices: HashMap<AssetPair, PriceWithDecimals>,
     }
 
-    #[allow(unreachable_code)] //TODO fixme
-    async fn process_block(
-        block: AppendBlock,
-        matcher_address: &Address,
-        sink: &mpsc::Sender<EventWithFeedback>,
-    ) -> Result<(), anyhow::Error> {
-        //TODO aggregate prices from the block, merge with the previous price
-        for tx in block.transactions {
-            if tx.sender == *matcher_address {
-                let event = Event::PriceChanged {
-                    amount_asset: tx.exchange_tx.amount_asset,
-                    price_asset: tx.exchange_tx.price_asset,
-                    current_price: PriceOHLC::from_single_value(tx.exchange_tx.price),
-                    previous_price: todo!("previous price"),
-                };
-                let (tx, rx) = oneshot::channel();
-                let evf = EventWithFeedback {
-                    event,
-                    result_tx: tx,
-                };
+    impl Source {
+        pub fn new(matcher_address: Address) -> Self {
+            Source {
+                matcher_address,
+                prices: HashMap::new(),
             }
         }
-        Ok(())
+
+        pub async fn init_prices(
+            &mut self,
+            data_service_url: &str,
+            assets: asset::RemoteGateway,
+        ) -> Result<(), anyhow::Error> {
+            let pairs = load_pairs(data_service_url, assets).await?;
+            for pair in pairs {
+                self.prices.insert(pair.pair, pair.last_price);
+            }
+            Ok(())
+        }
+
+        pub async fn start(
+            &mut self,
+            blockchain_updates_url: String,
+            starting_height: u32,
+            sink: mpsc::Sender<EventWithFeedback>,
+        ) -> Result<(), anyhow::Error> {
+            let client = BlockchainUpdatesClient::connect(blockchain_updates_url).await?;
+            let mut stream = client.stream(starting_height).await?;
+            while let Some(upd) = stream.recv().await {
+                match upd {
+                    BlockchainUpdate::Append(block) => {
+                        let result = self.process_block(block, &sink).await;
+                        match result {
+                            Ok(()) => {}
+                            Err(Error::StopProcessing) => break,
+                            Err(Error::EventProcessingFailed(err)) => {
+                                println!("ERROR | Event processing failed: {err:?}");
+                                return Err(err.into());
+                            }
+                        }
+                    }
+                    BlockchainUpdate::Rollback(_) => {}
+                }
+            }
+            Ok(())
+        }
+
+        async fn process_block(
+            &mut self,
+            block: AppendBlock,
+            sink: &mpsc::Sender<EventWithFeedback>,
+        ) -> Result<(), Error> {
+            //TODO aggregate prices from the block, merge with the previous price
+            for tx in block.transactions {
+                if tx.sender == self.matcher_address {
+                    let asset_pair = AssetPair {
+                        amount_asset: tx.exchange_tx.amount_asset,
+                        price_asset: tx.exchange_tx.price_asset,
+                    };
+                    let new_price = PriceWithDecimals {
+                        price: tx.exchange_tx.price,
+                        decimals: 8, // This is a hard-coded value
+                    };
+                    if let Some(prev_price) = self.prices.get(&asset_pair) {
+                        let event = Event::PriceChanged {
+                            asset_pair: asset_pair.clone(),
+                            current_price: PriceOHLC::from_single_value(new_price.price), //todo use decimals!
+                            previous_price: PriceOHLC::from_single_value(prev_price.price), //todo use decimals!!
+                        };
+                        let (tx, rx) = oneshot::channel();
+                        let evf = EventWithFeedback {
+                            event,
+                            result_tx: tx,
+                        };
+                        sink.send(evf).await.map_err(|_| Error::StopProcessing)?;
+                        let result = rx.await.map_err(|_| Error::StopProcessing)?;
+                        result.map_err(|err| Error::EventProcessingFailed(err))?;
+                    }
+                    self.prices.insert(asset_pair, new_price);
+                }
+            }
+            Ok(())
+        }
+    }
+
+    enum Error {
+        StopProcessing,
+        EventProcessingFailed(crate::error::Error),
     }
 }
 
 mod data_service {
     use crate::{
         asset,
-        model::Asset,
+        model::{Asset, AssetPair},
         stream::{PriceWithDecimals, RawPrice},
     };
     use anyhow::ensure;
@@ -69,8 +126,7 @@ mod data_service {
     };
 
     pub struct Pair {
-        pub amount_asset: Asset,
-        pub price_asset: Asset,
+        pub pair: AssetPair,
         pub last_price: PriceWithDecimals,
     }
 
@@ -105,8 +161,10 @@ mod data_service {
         );
         let price_decimals = decimals as u8; // Cast is safe due to the check above
         let pair = Pair {
-            amount_asset,
-            price_asset,
+            pair: AssetPair {
+                amount_asset,
+                price_asset,
+            },
             last_price: PriceWithDecimals {
                 price: last_price_raw,
                 decimals: price_decimals,
