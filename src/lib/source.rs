@@ -7,7 +7,7 @@ pub mod prices {
     use crate::{
         model::Address,
         processing::EventWithFeedback,
-        stream::{Event, PriceOHLC, RawPrice},
+        stream::{Event, PriceOHLC, PriceWithDecimals, RawPrice},
     };
 
     pub async fn start(
@@ -52,6 +52,67 @@ pub mod prices {
             }
         }
         Ok(())
+    }
+}
+
+mod data_service {
+    use crate::{
+        asset,
+        model::Asset,
+        stream::{PriceWithDecimals, RawPrice},
+    };
+    use anyhow::ensure;
+    use bigdecimal::ToPrimitive;
+    use wavesexchange_apis::{
+        data_service::{dto, DataService},
+        HttpClient,
+    };
+
+    pub struct Pair {
+        pub amount_asset: Asset,
+        pub price_asset: Asset,
+        pub last_price: PriceWithDecimals,
+    }
+
+    pub(super) async fn load_pairs(
+        data_service_url: &str,
+        assets: asset::RemoteGateway,
+    ) -> Result<Vec<Pair>, anyhow::Error> {
+        let client = HttpClient::<DataService>::from_base_url(data_service_url);
+        let pairs = client.pairs().await?;
+        let pairs = pairs.items;
+        let mut res = Vec::with_capacity(pairs.len());
+        for pair in pairs.into_iter() {
+            let pair = convert_pair(pair, &assets).await?;
+            res.push(pair);
+        }
+        Ok(res)
+    }
+
+    async fn convert_pair(
+        pair: dto::Pair,
+        assets: &asset::RemoteGateway,
+    ) -> Result<Pair, anyhow::Error> {
+        let amount_asset = Asset::from_id(&pair.amount_asset).expect("amt asset");
+        let price_asset = Asset::from_id(&pair.price_asset).expect("price asset");
+        let last_price_raw = pair.data.last_price.to_u64().expect("price fits u64");
+        let amount_asset_decimals = assets.decimals(&amount_asset).await? as i16;
+        let price_asset_decimals = assets.decimals(&price_asset).await? as i16;
+        let decimals = -8 - amount_asset_decimals + price_asset_decimals;
+        ensure!(
+            decimals >= 0 && decimals <= 256,
+            "Unexpected price_decimals: {decimals} for asset pair {amount_asset}/{price_asset}"
+        );
+        let price_decimals = decimals as u8; // Cast is safe due to the check above
+        let pair = Pair {
+            amount_asset,
+            price_asset,
+            last_price: PriceWithDecimals {
+                price: last_price_raw,
+                decimals: price_decimals,
+            },
+        };
+        Ok(pair)
     }
 }
 
