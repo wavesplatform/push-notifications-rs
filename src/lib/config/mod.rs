@@ -1,5 +1,6 @@
 pub mod lokalise;
 pub mod postgres;
+pub mod processor;
 pub mod sender;
 
 use crate::error::Error;

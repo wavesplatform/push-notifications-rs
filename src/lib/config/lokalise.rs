@@ -1,6 +1,7 @@
 use crate::error::Error;
 use serde::Deserialize;
 
+//TODO probably this config is unneeded, everything should be placed in processor config
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub lokalise_sdk_token: String,
