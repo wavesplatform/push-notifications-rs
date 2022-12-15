@@ -18,5 +18,4 @@ RUN /usr/sbin/update-ca-certificates
 
 COPY --from=builder /usr/local/cargo/bin/* ./
 
-CMD ["./api"]
-
+CMD ["/app/api"]
