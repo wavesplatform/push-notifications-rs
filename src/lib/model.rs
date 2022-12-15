@@ -30,7 +30,7 @@ impl AsBase58String for Address {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Asset {
     Waves,
-    AssetId(AssetId),
+    IssuedAsset(AssetId),
 }
 
 impl Asset {
@@ -41,14 +41,14 @@ impl Asset {
             Ok(Asset::Waves)
         } else {
             let asset_id = AssetId::from_string(id).map_err(|_| ())?;
-            Ok(Asset::AssetId(asset_id))
+            Ok(Asset::IssuedAsset(asset_id))
         }
     }
 
     pub fn id(&self) -> String {
         match self {
             Asset::Waves => Self::WAVES_ASSET_ID.to_string(),
-            Asset::AssetId(asset_id) => asset_id.as_base58_string(),
+            Asset::IssuedAsset(asset_id) => asset_id.as_base58_string(),
         }
     }
 }

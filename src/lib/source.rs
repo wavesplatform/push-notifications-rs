@@ -529,7 +529,7 @@ mod blockchain_updates {
             if asset_id.is_empty() {
                 model::Asset::Waves
             } else {
-                model::Asset::AssetId(model::AssetId::from_bytes(asset_id.clone()))
+                model::Asset::IssuedAsset(model::AssetId::from_bytes(asset_id.clone()))
             }
         }
 
