@@ -17,10 +17,13 @@
 
 ### Processor
 
-| Env variable       | Required | Default | Note                                       |
-| ------------------ | -------- | ------- | ------------------------------------------ |
-| LOKALISE_SDK_TOKEN | YES      |         | API token from lokalise                    |
-| ASSETS_URL         | YES      |         | Assets-service root url. No trailing slash |
+| Env variable           | Required | Default | Note                                       |
+|------------------------| -------- | ------- |--------------------------------------------|
+| LOKALISE_SDK_TOKEN     | YES      |         | API token from lokalise                    |
+| ASSETS_SERVICE_URL     | YES      |         | Assets-service root url. No trailing slash |
+| DATA_SERVICE_URL       | YES      |         | Data-service root url. No trailing slash   |
+| BLOCKCHAIN_UPDATES_URL | YES      |         | Blockchain updates url                     |
+| MATCHER_ADDRESS        | YES      |         | Matcher address (base58)                   |
 
 ### API
 
