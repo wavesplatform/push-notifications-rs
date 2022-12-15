@@ -50,7 +50,7 @@ diesel::table! {
         subscription_uid -> Int4,
         amount_asset_id -> Varchar,
         price_asset_id -> Varchar,
-        price_threshold -> Int8,
+        price_threshold -> Float8,
     }
 }
 

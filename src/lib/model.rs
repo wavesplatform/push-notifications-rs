@@ -59,12 +59,6 @@ impl fmt::Display for Asset {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct AssetAmount {
-    pub asset: Asset,
-    pub value: u64,
-}
-
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AssetPair {
     pub amount_asset: Asset,

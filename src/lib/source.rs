@@ -1,6 +1,7 @@
 //! Blockchain updates
 
 pub mod prices {
+    use itertools::Itertools;
     use std::collections::HashMap;
 
     use tokio::sync::{mpsc, oneshot};
@@ -13,19 +14,19 @@ pub mod prices {
         asset,
         model::{Address, AssetPair},
         processing::EventWithFeedback,
-        stream::{Event, PriceOHLC, PriceWithDecimals, RawPrice},
+        stream::{Event, PriceWindow, PriceWithDecimals},
     };
 
     pub struct Source {
         matcher_address: Address,
-        prices: HashMap<AssetPair, PriceWithDecimals>,
+        last_prices: HashMap<AssetPair, PriceWithDecimals>,
     }
 
     impl Source {
         pub fn new(matcher_address: Address) -> Self {
             Source {
                 matcher_address,
-                prices: HashMap::new(),
+                last_prices: HashMap::new(),
             }
         }
 
@@ -36,7 +37,7 @@ pub mod prices {
         ) -> Result<(), anyhow::Error> {
             let pairs = load_pairs(data_service_url, assets).await?;
             for pair in pairs {
-                self.prices.insert(pair.pair, pair.last_price);
+                self.last_prices.insert(pair.pair, pair.last_price);
             }
             Ok(())
         }
@@ -73,7 +74,16 @@ pub mod prices {
             block: AppendBlock,
             sink: &mpsc::Sender<EventWithFeedback>,
         ) -> Result<(), Error> {
-            //TODO aggregate prices from the block, merge with the previous price
+            let block_prices = self.aggregate_prices_from_block(block);
+            self.send_price_events(block_prices, sink).await
+        }
+
+        fn aggregate_prices_from_block(
+            &mut self,
+            block: AppendBlock,
+        ) -> HashMap<AssetPair, PriceWindow> {
+            let mut block_prices = HashMap::<AssetPair, PriceWindow>::new();
+
             for tx in block.transactions {
                 if tx.sender == self.matcher_address {
                     let asset_pair = AssetPair {
@@ -84,22 +94,38 @@ pub mod prices {
                         price: tx.exchange_tx.price,
                         decimals: 8, // This is a hard-coded value
                     };
-                    if let Some(prev_price) = self.prices.get(&asset_pair) {
-                        let event = Event::PriceChanged {
-                            asset_pair: asset_pair.clone(),
-                            current_price: PriceOHLC::from_single_value(new_price.price), //todo use decimals!
-                            previous_price: PriceOHLC::from_single_value(prev_price.price), //todo use decimals!!
-                        };
-                        let (tx, rx) = oneshot::channel();
-                        let evf = EventWithFeedback {
-                            event,
-                            result_tx: tx,
-                        };
-                        sink.send(evf).await.map_err(|_| Error::StopProcessing)?;
-                        let result = rx.await.map_err(|_| Error::StopProcessing)?;
-                        result.map_err(|err| Error::EventProcessingFailed(err))?;
+                    if let Some(prev_price) = self.last_prices.get(&asset_pair) {
+                        block_prices
+                            .entry(asset_pair.clone())
+                            .and_modify(|price| *price = price.clone().merge(new_price))
+                            .or_insert_with(|| prev_price.merge(new_price));
                     }
-                    self.prices.insert(asset_pair, new_price);
+                    self.last_prices.insert(asset_pair, new_price);
+                }
+            }
+
+            block_prices
+        }
+
+        async fn send_price_events(
+            &self,
+            block_prices: HashMap<AssetPair, PriceWindow>,
+            sink: &mpsc::Sender<EventWithFeedback>,
+        ) -> Result<(), Error> {
+            for (asset_pair, price_window) in block_prices {
+                if !price_window.is_empty() {
+                    let event = Event::PriceChanged {
+                        asset_pair,
+                        price_window,
+                    };
+                    let (tx, rx) = oneshot::channel();
+                    let evf = EventWithFeedback {
+                        event,
+                        result_tx: tx,
+                    };
+                    sink.send(evf).await.map_err(|_| Error::StopProcessing)?;
+                    let result = rx.await.map_err(|_| Error::StopProcessing)?;
+                    result.map_err(|err| Error::EventProcessingFailed(err))?;
                 }
             }
             Ok(())
@@ -116,7 +142,7 @@ mod data_service {
     use crate::{
         asset,
         model::{Asset, AssetPair},
-        stream::{PriceWithDecimals, RawPrice},
+        stream::PriceWithDecimals,
     };
     use anyhow::ensure;
     use bigdecimal::ToPrimitive;

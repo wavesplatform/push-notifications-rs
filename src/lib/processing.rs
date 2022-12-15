@@ -117,29 +117,22 @@ impl MessagePump {
             (
                 Event::PriceChanged {
                     asset_pair: event_assets,
-                    current_price,
-                    previous_price,
+                    price_window,
                 },
                 Topic::PriceThreshold {
                     amount_asset: topic_amount_asset,
+                    price_asset: topic_price_asset,
                     price_threshold,
                 },
             ) => {
                 debug_assert_eq!(event_assets.amount_asset, *topic_amount_asset);
-                debug_assert_eq!(event_assets.price_asset, price_threshold.asset);
-                debug_assert!(
-                    current_price.has_crossed_threshold(previous_price, price_threshold.value)
-                );
+                debug_assert_eq!(event_assets.price_asset, *topic_price_asset);
+                debug_assert!(price_window.contains(*price_threshold));
                 let (amount_asset, price_asset) = event_assets.assets_as_ref();
-                let decimals = self.assets.decimals(&price_threshold.asset).await?;
-                let price_threshold = PriceWithDecimals {
-                    price: price_threshold.value,
-                    decimals, //TODO is this the correct decimals for the price threshold?
-                };
                 Message::PriceThresholdReached {
                     amount_asset_ticker: self.asset_ticker(amount_asset).await?,
                     price_asset_ticker: self.asset_ticker(price_asset).await?,
-                    threshold: price_threshold.value(),
+                    threshold: *price_threshold,
                 }
             }
             (_, _) => unreachable!("unrecognized combination of subscription and event"),
