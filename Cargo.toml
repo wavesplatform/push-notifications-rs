@@ -33,6 +33,10 @@ waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-sche
 bs58 = "0.4"
 bigdecimal = "0.1"
 
+#TODO This crate is not needed directly, but it is here, with a specific version, to fix the build of `waves-rust` crate.
+#TODO Remove it when `waves-rust` > 0.2.2 will fix its dependency on this.
+curve25519-dalek = "=4.0.0-pre.2"
+
 [lib]
 name = "lib"
 path = "src/lib/lib.rs"
