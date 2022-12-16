@@ -30,6 +30,7 @@ pub mod prices {
             }
         }
 
+        //TODO Initialization is an implementation detail. Rework as factory or smth like that.
         pub async fn init_prices(
             &mut self,
             data_service_url: &str,
