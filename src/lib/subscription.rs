@@ -65,9 +65,9 @@ impl Repo {
             }
             Event::PriceChanged {
                 asset_pair,
-                price_window,
+                price_range,
             } => {
-                let (price_low, price_high) = price_window.low_high();
+                let (price_low, price_high) = price_range.low_high();
                 self.matching_price_subscriptions(
                     asset_pair.amount_asset.id(),
                     asset_pair.price_asset.id(),

@@ -14,7 +14,7 @@ pub mod prices {
         asset,
         model::{Address, AssetPair},
         processing::EventWithFeedback,
-        stream::{Event, PriceWindow, PriceWithDecimals},
+        stream::{Event, PriceLowHigh, PriceWithDecimals},
     };
 
     pub struct Source {
@@ -82,8 +82,8 @@ pub mod prices {
         fn aggregate_prices_from_block(
             &mut self,
             block: AppendBlock,
-        ) -> HashMap<AssetPair, PriceWindow> {
-            let mut block_prices = HashMap::<AssetPair, PriceWindow>::new();
+        ) -> HashMap<AssetPair, PriceLowHigh> {
+            let mut block_prices = HashMap::<AssetPair, PriceLowHigh>::new();
 
             for tx in block.transactions {
                 if tx.sender == self.matcher_address {
@@ -110,14 +110,14 @@ pub mod prices {
 
         async fn send_price_events(
             &self,
-            block_prices: HashMap<AssetPair, PriceWindow>,
+            block_prices: HashMap<AssetPair, PriceLowHigh>,
             sink: &mpsc::Sender<EventWithFeedback>,
         ) -> Result<(), Error> {
-            for (asset_pair, price_window) in block_prices {
-                if !price_window.is_empty() {
+            for (asset_pair, price_range) in block_prices {
+                if !price_range.is_empty() {
                     let event = Event::PriceChanged {
                         asset_pair,
-                        price_window,
+                        price_range,
                     };
                     let (tx, rx) = oneshot::channel();
                     let evf = EventWithFeedback {

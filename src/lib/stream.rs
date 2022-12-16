@@ -33,7 +33,7 @@ pub struct PriceWithDecimals {
 
 /// Price range [low..high], stored as floating point numbers (decimals applied)
 #[derive(Clone, Debug)]
-pub struct PriceWindow {
+pub struct PriceLowHigh {
     low: Price,
     high: Price,
 }
@@ -47,12 +47,12 @@ pub enum Event {
     },
     PriceChanged {
         asset_pair: AssetPair,
-        price_window: PriceWindow,
+        price_range: PriceLowHigh,
     },
 }
 
 mod impls {
-    use super::{Price, PriceWindow, PriceWithDecimals, RawPrice};
+    use super::{Price, PriceLowHigh, PriceWithDecimals, RawPrice};
 
     impl PriceWithDecimals {
         pub fn value(&self) -> Price {
@@ -71,10 +71,10 @@ mod impls {
         assert_eq!(p(12345678, 4).value(), 1234.5678);
     }
 
-    impl PriceWindow {
+    impl PriceLowHigh {
         pub fn from_single_price(price: PriceWithDecimals) -> Self {
             let value = price.value();
-            PriceWindow {
+            PriceLowHigh {
                 low: value,
                 high: value,
             }
@@ -83,7 +83,7 @@ mod impls {
         pub fn merge(self, price: PriceWithDecimals) -> Self {
             debug_assert!(self.low <= self.high, "broken invariant low <= high");
             let price = price.value();
-            PriceWindow {
+            PriceLowHigh {
                 low: if price < self.low { price } else { self.low },
                 high: if price > self.high { price } else { self.high },
             }
@@ -105,16 +105,16 @@ mod impls {
     }
 
     impl PriceWithDecimals {
-        pub fn merge(self, other: Self) -> PriceWindow {
-            PriceWindow::from_single_price(self).merge(other)
+        pub fn merge(self, other: Self) -> PriceLowHigh {
+            PriceLowHigh::from_single_price(self).merge(other)
         }
     }
 
     #[test]
-    fn test_price_window() {
+    fn test_price_low_high() {
         let p = |price, decimals| PriceWithDecimals { price, decimals };
 
-        let p1 = PriceWindow::from_single_price(p(12345, 2));
+        let p1 = PriceLowHigh::from_single_price(p(12345, 2));
         assert_eq!(p1.is_empty(), true);
         assert_eq!(p1.low_high(), (123.45, 123.45));
         assert_eq!(p1.contains(123.44), false);
