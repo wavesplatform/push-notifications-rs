@@ -10,7 +10,8 @@ include:
     file: 'ci-functions/migrations.yml'
 
 variables:
-  APP_NAME: push-notifications-rs
+  APP_NAME: push-notifications
+  CHART_LIST: "push-notifications-api push-notifications-processor push-notifications-sender"
   DB_NAME: push_notifications_rs
   MIGRATION_INIT_CMD: /app/migrate init
   MIGRATION_UP_CMD: /app/migration up
