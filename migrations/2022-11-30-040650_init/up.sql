@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS topics_price_threshold (
     subscription_uid integer primary key,
     amount_asset_id varchar not null,
     price_asset_id varchar not null,
-    price_threshold bigint not null,
+    price_threshold double precision not null,
     foreign key (subscription_uid) references subscriptions(uid)
 );
 create index on topics_price_threshold(amount_asset_id, price_asset_id, price_threshold);

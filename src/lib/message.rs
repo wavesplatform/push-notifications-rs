@@ -5,7 +5,7 @@ use crate::{
     device::Device,
     error::Error,
     schema::messages,
-    stream::{OrderExecution, OrderSide, OrderType},
+    stream::{OrderExecution, OrderSide, OrderType, Price},
 };
 
 pub enum Message {
@@ -19,7 +19,7 @@ pub enum Message {
     PriceThresholdReached {
         amount_asset_ticker: String,
         price_asset_ticker: String,
-        threshold: f64, // decimals already applied
+        threshold: Price, // decimals already applied
     },
 }
 

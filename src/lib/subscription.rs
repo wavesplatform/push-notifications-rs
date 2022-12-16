@@ -4,9 +4,9 @@ use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use crate::{
     error::Error,
-    model::{Address, Amount, AsBase58String, AssetId},
+    model::{Address, AsBase58String, Asset},
     schema::{subscriptions, topics_price_threshold},
-    stream::{Event, RawPrice},
+    stream::{Event, Price},
 };
 
 pub struct Subscription {
@@ -24,12 +24,13 @@ pub enum SubscriptionMode {
 
 pub enum Topic {
     OrderFulfilled {
-        amount_asset: Option<AssetId>,
-        price_asset: Option<AssetId>,
+        amount_asset: Asset,
+        price_asset: Asset,
     },
     PriceThreshold {
-        amount_asset: Option<AssetId>,
-        price_threshold: Amount,
+        amount_asset: Asset,
+        price_asset: Asset,
+        price_threshold: Price,
     },
 }
 
@@ -63,18 +64,13 @@ impl Repo {
                 todo!("impl find matching subscriptions for OrderExecuted event")
             }
             Event::PriceChanged {
-                amount_asset_id,
-                price_asset_id,
-                current_price,
-                previous_price,
+                asset_pair,
+                price_range,
             } => {
-                let amount_asset_id = amount_asset_id.as_base58_string();
-                let price_asset_id = price_asset_id.as_base58_string();
-                let price = previous_price + current_price;
-                let (price_low, price_high) = price.low_high();
+                let (price_low, price_high) = price_range.low_high();
                 self.matching_price_subscriptions(
-                    amount_asset_id,
-                    price_asset_id,
+                    asset_pair.amount_asset.id(),
+                    asset_pair.price_asset.id(),
                     price_low,
                     price_high,
                     conn,
@@ -90,8 +86,8 @@ impl Repo {
         &self,
         amount_asset_id: String,
         price_asset_id: String,
-        price_low: RawPrice,
-        price_high: RawPrice,
+        price_low: Price,
+        price_high: Price,
         conn: &mut AsyncPgConnection,
     ) -> Result<Vec<Subscription>, Error> {
         let rows = topics_price_threshold::table
@@ -107,10 +103,7 @@ impl Repo {
             ))
             .filter(topics_price_threshold::amount_asset_id.eq(amount_asset_id))
             .filter(topics_price_threshold::price_asset_id.eq(price_asset_id))
-            .filter(
-                topics_price_threshold::price_threshold
-                    .between(price_low as i64, price_high as i64),
-            )
+            .filter(topics_price_threshold::price_threshold.between(price_low, price_high))
             .order(subscriptions::uid)
             .load::<(String, DateTime<Utc>, i32, String)>(conn)
             .await?;

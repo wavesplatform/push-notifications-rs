@@ -1,4 +1,4 @@
-use crate::model::{Amount, AssetId};
+use crate::model::{Amount, AssetPair};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum OrderType {
@@ -18,93 +18,124 @@ pub enum OrderExecution {
     Partial { percentage: f64 },
 }
 
+/// Price value as floating point, decimals applied
+pub type Price = f64;
+
 /// Raw price value with unknown decimals
 pub type RawPrice = u64;
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct PriceOHLC {
-    open: RawPrice,
-    close: RawPrice,
-    low: RawPrice,
-    high: RawPrice,
+/// Price as integer together with corresponding decimals
+#[derive(Copy, Clone, Debug)]
+pub struct PriceWithDecimals {
+    pub price: u64,
+    pub decimals: u8,
+}
+
+/// Price range [low..high], stored as floating point numbers (decimals applied)
+#[derive(Clone, Debug)]
+pub struct PriceLowHigh {
+    low: Price,
+    high: Price,
 }
 
 pub enum Event {
     OrderExecuted {
         order_type: OrderType,
         side: OrderSide,
-        amount_asset_id: AssetId,
-        price_asset_id: AssetId,
+        asset_pair: AssetPair,
         execution: OrderExecution,
     },
     PriceChanged {
-        amount_asset_id: AssetId,
-        price_asset_id: AssetId,
-        current_price: PriceOHLC,
-        previous_price: PriceOHLC,
+        asset_pair: AssetPair,
+        price_range: PriceLowHigh,
     },
 }
 
 mod impls {
-    use super::{PriceOHLC, RawPrice};
-    use itertools::Itertools;
-    use std::ops::Add;
+    use super::{Price, PriceLowHigh, PriceWithDecimals, RawPrice};
 
-    impl PriceOHLC {
-        pub fn low_high(&self) -> (RawPrice, RawPrice) {
-            debug_assert!(self.low <= self.high);
-            (self.low, self.high)
-        }
-
-        pub fn has_crossed_threshold(&self, other: &Self, threshold: RawPrice) -> bool {
-            debug_assert!(self.low <= self.high);
-            debug_assert!(other.low <= other.high);
-            let threshold = threshold as i64;
-            let mut prices = [
-                self.open as i64,
-                self.close as i64,
-                self.low as i64,
-                self.high as i64,
-                other.open as i64,
-                other.close as i64,
-                other.low as i64,
-                other.high as i64,
-            ];
-            prices.sort_unstable_by(i64::cmp);
-            prices
-                .into_iter()
-                .tuple_windows()
-                .any(|(a, b)| i64::signum(threshold - a) != i64::signum(threshold - b))
-        }
-    }
-
-    impl Add for &PriceOHLC {
-        type Output = PriceOHLC;
-
-        fn add(self, rhs: &PriceOHLC) -> PriceOHLC {
-            debug_assert!(self.low <= self.high);
-            debug_assert!(rhs.low <= rhs.high);
-            debug_assert_eq!(self.close, rhs.open);
-            PriceOHLC {
-                open: self.open,
-                close: rhs.close,
-                low: self.low.min(rhs.low).min(rhs.open),
-                high: self.high.max(rhs.high).max(rhs.open),
-            }
+    impl PriceWithDecimals {
+        pub fn value(&self) -> Price {
+            let value = self.price as f64;
+            let divisor = 10_f64.powi(self.decimals as i32);
+            value / divisor
         }
     }
 
     #[test]
-    fn test_ohlc() {
-        let ohlc = |open, low, high, close| PriceOHLC {
-            open,
-            close,
-            low,
-            high,
-        };
+    fn test_price_decimals() {
+        let p = |price, decimals| PriceWithDecimals { price, decimals };
+        assert_eq!(p(12345678, 1).value(), 1234567.8);
+        assert_eq!(p(12345678, 2).value(), 123456.78);
+        assert_eq!(p(12345678, 3).value(), 12345.678);
+        assert_eq!(p(12345678, 4).value(), 1234.5678);
+    }
 
-        assert_eq!(ohlc(1, 0, 3, 2).low_high(), (0, 3));
-        assert_eq!(&ohlc(1, 0, 3, 2) + &ohlc(2, 1, 9, 5), ohlc(1, 0, 9, 5));
-        assert!(ohlc(1, 0, 3, 2).has_crossed_threshold(&ohlc(6, 5, 8, 7), 4));
+    impl PriceLowHigh {
+        pub fn from_single_price(price: PriceWithDecimals) -> Self {
+            let value = price.value();
+            PriceLowHigh {
+                low: value,
+                high: value,
+            }
+        }
+
+        pub fn merge(self, price: PriceWithDecimals) -> Self {
+            debug_assert!(self.low <= self.high, "broken invariant low <= high");
+            let price = price.value();
+            PriceLowHigh {
+                low: if price < self.low { price } else { self.low },
+                high: if price > self.high { price } else { self.high },
+            }
+        }
+
+        pub fn is_empty(&self) -> bool {
+            self.low == self.high
+        }
+
+        pub fn low_high(&self) -> (Price, Price) {
+            debug_assert!(self.low <= self.high, "broken invariant low <= high");
+            (self.low, self.high)
+        }
+
+        pub fn contains(&self, price: Price) -> bool {
+            debug_assert!(self.low <= self.high, "broken invariant low <= high");
+            self.low <= price && price <= self.high
+        }
+    }
+
+    impl PriceWithDecimals {
+        pub fn merge(self, other: Self) -> PriceLowHigh {
+            PriceLowHigh::from_single_price(self).merge(other)
+        }
+    }
+
+    #[test]
+    fn test_price_low_high() {
+        let p = |price, decimals| PriceWithDecimals { price, decimals };
+
+        let p1 = PriceLowHigh::from_single_price(p(12345, 2));
+        assert_eq!(p1.is_empty(), true);
+        assert_eq!(p1.low_high(), (123.45, 123.45));
+        assert_eq!(p1.contains(123.44), false);
+        assert_eq!(p1.contains(123.46), false);
+
+        let p2 = p1.merge(p(12000, 2));
+        assert_eq!(p2.is_empty(), false);
+        assert_eq!(p2.low_high(), (120.00, 123.45));
+        assert_eq!(p2.contains(123.00), true);
+        assert_eq!(p2.contains(100.00), false);
+        assert_eq!(p2.contains(200.00), false);
+
+        let p3 = p2.merge(p(54321, 2));
+        assert_eq!(p3.is_empty(), false);
+        assert_eq!(p3.low_high(), (120.00, 543.21));
+        assert_eq!(p3.contains(123.00), true);
+        assert_eq!(p3.contains(100.00), false);
+        assert_eq!(p3.contains(600.00), false);
+
+        let p4 = p3.merge(p(7000000, 4)); // different decimals - ok
+        assert_eq!(p4.is_empty(), false);
+        assert_eq!(p4.low_high(), (120.00, 700.00));
     }
 }

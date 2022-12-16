@@ -3,8 +3,8 @@ use crate::{
     error::Error,
     localization,
     message::{self, LocalizedMessage, Message, PreparedMessage},
-    model::{AsBase58String, AssetId, Lang},
-    stream::{Event, OrderExecution},
+    model::{Asset, Lang},
+    stream::{Event, OrderExecution, PriceWithDecimals},
     subscription::{self, Subscription, SubscriptionMode, Topic},
 };
 use diesel_async::{AsyncConnection, AsyncPgConnection};
@@ -12,7 +12,7 @@ use futures::FutureExt;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
-pub struct EventWithResult {
+pub struct EventWithFeedback {
     pub event: Event,
     pub result_tx: oneshot::Sender<Result<(), Error>>,
 }
@@ -44,11 +44,11 @@ impl MessagePump {
 
     pub async fn run_event_loop(
         self: Arc<Self>,
-        mut events: mpsc::Receiver<EventWithResult>,
+        mut events: mpsc::Receiver<EventWithFeedback>,
         mut conn: AsyncPgConnection,
     ) {
         while let Some(event) = events.recv().await {
-            let EventWithResult { event, result_tx } = event;
+            let EventWithFeedback { event, result_tx } = event;
             let this = self.clone();
             let res = conn
                 .transaction(|conn| {
@@ -95,54 +95,44 @@ impl MessagePump {
                 Event::OrderExecuted {
                     order_type,
                     side,
-                    amount_asset_id,
-                    price_asset_id,
+                    asset_pair: event_assets,
                     execution,
                 },
                 Topic::OrderFulfilled {
-                    amount_asset,
-                    price_asset,
+                    amount_asset: topic_amount_asset,
+                    price_asset: topic_price_asset,
                 },
             ) => {
-                debug_assert_eq!(amount_asset_id, amount_asset.as_ref().expect("amount"));
-                debug_assert_eq!(price_asset_id, price_asset.as_ref().expect("price"));
+                debug_assert_eq!(event_assets.amount_asset, *topic_amount_asset);
+                debug_assert_eq!(event_assets.price_asset, *topic_price_asset);
+                let (amount_asset, price_asset) = event_assets.assets_as_ref();
                 Message::OrderExecuted {
                     order_type: *order_type,
                     side: *side,
-                    amount_asset_ticker: self.asset_ticker(amount_asset_id).await?,
-                    price_asset_ticker: self.asset_ticker(price_asset_id).await?,
+                    amount_asset_ticker: self.asset_ticker(amount_asset).await?,
+                    price_asset_ticker: self.asset_ticker(price_asset).await?,
                     execution: *execution,
                 }
             }
             (
                 Event::PriceChanged {
-                    amount_asset_id,
-                    price_asset_id,
-                    current_price,
-                    previous_price,
+                    asset_pair: event_assets,
+                    price_range,
                 },
                 Topic::PriceThreshold {
-                    amount_asset,
+                    amount_asset: topic_amount_asset,
+                    price_asset: topic_price_asset,
                     price_threshold,
                 },
             ) => {
-                debug_assert_eq!(amount_asset_id, amount_asset.as_ref().expect("amount"));
-                debug_assert_eq!(
-                    price_asset_id,
-                    price_threshold.asset_id().as_ref().expect("price")
-                );
-                debug_assert!(
-                    current_price.has_crossed_threshold(previous_price, price_threshold.value())
-                );
-                let decimals = self
-                    .assets
-                    .decimals(price_threshold.asset_id().as_ref().expect("price_asset"))
-                    .await?;
-                let price_threshold = apply_decimals(price_threshold.value(), decimals);
+                debug_assert_eq!(event_assets.amount_asset, *topic_amount_asset);
+                debug_assert_eq!(event_assets.price_asset, *topic_price_asset);
+                debug_assert!(price_range.contains(*price_threshold));
+                let (amount_asset, price_asset) = event_assets.assets_as_ref();
                 Message::PriceThresholdReached {
-                    amount_asset_ticker: self.asset_ticker(amount_asset_id).await?,
-                    price_asset_ticker: self.asset_ticker(price_asset_id).await?,
-                    threshold: price_threshold,
+                    amount_asset_ticker: self.asset_ticker(amount_asset).await?,
+                    price_asset_ticker: self.asset_ticker(price_asset).await?,
+                    threshold: *price_threshold,
                 }
             }
             (_, _) => unreachable!("unrecognized combination of subscription and event"),
@@ -150,9 +140,9 @@ impl MessagePump {
         Ok(res)
     }
 
-    async fn asset_ticker(&self, asset_id: &AssetId) -> Result<String, Error> {
-        let maybe_ticker = self.assets.ticker(asset_id).await?;
-        let ticker = maybe_ticker.unwrap_or_else(|| asset_id.as_base58_string());
+    async fn asset_ticker(&self, asset: &Asset) -> Result<String, Error> {
+        let maybe_ticker = self.assets.ticker(asset).await?;
+        let ticker = maybe_ticker.unwrap_or_else(|| asset.id());
         Ok(ticker)
     }
 
@@ -168,9 +158,4 @@ impl MessagePump {
                 .expect("fallback translation")
         }
     }
-}
-
-fn apply_decimals(value: u64, decimals: u8) -> f64 {
-    let divisor = 1_u64.pow(decimals as u32);
-    value as f64 / divisor as f64
 }

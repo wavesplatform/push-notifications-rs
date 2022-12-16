@@ -9,6 +9,9 @@ pub enum Error {
     #[error("LoadConfigFailed: {0}")]
     LoadConfigFailed(#[from] envy::Error),
 
+    #[error("BadConfigValue: {0}")]
+    BadConfigValue(&'static str),
+
     #[error("HttpRequestError")]
     HttpRequestError(Arc<reqwest::Error>),
 
