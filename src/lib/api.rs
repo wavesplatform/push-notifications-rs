@@ -5,15 +5,23 @@ use std::sync::Arc;
 use tokio::sync::Mutex as AsyncMutex;
 use warp::{reject, Filter, Rejection};
 use wavesexchange_log::{error, info};
-use wavesexchange_warp::error::{error_handler_with_serde_qs, handler, internal, validation};
-use wavesexchange_warp::log::access;
-use wavesexchange_warp::MetricsWarpBuilder;
+use wavesexchange_warp::{
+    error::{error_handler_with_serde_qs, handler, internal, validation},
+    log::access,
+    MetricsWarpBuilder,
+};
 
 const ERROR_CODES_PREFIX: u16 = 95;
 
 type Pool = Arc<PgAsyncPool>;
 
-pub async fn start(port: u16, metrics_port: u16, repos: Repos, pool: PgAsyncPool) {
+pub async fn start(
+    port: u16,
+    metrics_port: u16,
+    devices: device::Repo,
+    subscriptions: subscription::Repo,
+    pool: PgAsyncPool,
+) {
     let error_handler = handler(ERROR_CODES_PREFIX, |err| match err {
         Error::ValidationError(field, error_details) => {
             let mut error_details = error_details.to_owned();
@@ -25,10 +33,12 @@ pub async fn start(port: u16, metrics_port: u16, repos: Repos, pool: PgAsyncPool
         _ => internal(ERROR_CODES_PREFIX),
     });
 
-    let with_repos = warp::any().map(move || repos.clone());
-    let with_conn = {
-        let sync_conn = Arc::new(pool);
-        warp::any().map(move || sync_conn.clone())
+    let with_devices = warp::any().map(move || devices.clone());
+    let with_subscriptions = warp::any().map(move || subscriptions.clone());
+
+    let with_pool = {
+        let pool = Arc::new(pool);
+        warp::any().map(move || pool.clone())
     };
 
     let fcm_uid = warp::header::<String>("X-Fcm-Uid");
@@ -38,16 +48,16 @@ pub async fn start(port: u16, metrics_port: u16, repos: Repos, pool: PgAsyncPool
         .and(warp::path!("device"))
         .and(fcm_uid)
         .and(user_addr)
-        .and(with_repos.clone())
-        .and(with_conn.clone())
+        .and(with_devices.clone())
+        .and(with_pool.clone())
         .and_then(controllers::unregister_device);
 
     let device_update = warp::patch()
         .and(warp::path!("device"))
         .and(fcm_uid)
         .and(user_addr)
-        .and(with_repos.clone())
-        .and(with_conn.clone())
+        .and(with_devices.clone())
+        .and(with_pool.clone())
         .and(warp::body::json::<dto::UpdateDevice>())
         .and_then(controllers::update_device);
 
@@ -55,24 +65,24 @@ pub async fn start(port: u16, metrics_port: u16, repos: Repos, pool: PgAsyncPool
         .and(warp::path!("device"))
         .and(fcm_uid)
         .and(user_addr)
-        .and(with_repos.clone())
-        .and(with_conn.clone())
+        .and(with_devices.clone())
+        .and(with_pool.clone())
         .and(warp::body::json::<dto::NewDevice>())
         .and_then(controllers::register_device);
 
     let topic_unsubscribe = warp::delete()
         .and(warp::path!("topics"))
         .and(user_addr)
-        .and(with_repos.clone())
-        .and(with_conn.clone())
+        .and(with_subscriptions.clone())
+        .and(with_pool.clone())
         .and(warp::body::json::<Option<dto::Topics>>())
         .and_then(controllers::unsubscribe_from_topics);
 
     let topic_subscribe = warp::post()
         .and(warp::path!("topics"))
         .and(user_addr)
-        .and(with_repos.clone())
-        .and(with_conn.clone())
+        .and(with_subscriptions.clone())
+        .and(with_pool.clone())
         .and(warp::body::json::<dto::Topics>())
         .and_then(controllers::subscribe_to_topics);
 
@@ -100,125 +110,127 @@ pub async fn start(port: u16, metrics_port: u16, repos: Repos, pool: PgAsyncPool
 }
 
 mod controllers {
-    use super::*;
-    use crate::{device::FcmUid, subscription::SubscriptionMode};
+    use super::{dto, Pool};
+    use crate::{
+        device::{self, FcmUid},
+        model::Address,
+        subscription::{self, SubscriptionMode},
+    };
     use chrono::FixedOffset;
-    use warp::{http::StatusCode, Reply};
+    use warp::{http::StatusCode, Rejection, Reply};
 
     pub async fn unregister_device(
         fcm_uid: FcmUid,
         addr: String,
-        repos: Repos,
+        devices: device::Repo,
         pool: Pool,
     ) -> Result<impl Reply, Rejection> {
-        repos
-            .device
-            .unregister(
-                &Address::from_string(&addr).unwrap(),
-                fcm_uid,
-                &mut pool.get().await.unwrap(),
-            )
-            .await?;
+        let address = Address::from_string(&addr).unwrap(); //TODO Don't unwrap, reply with error to the remote client
+
+        let mut conn = pool.get().await.unwrap(); //TODO Don't unwrap, handle errors correctly
+
+        devices.unregister(&address, fcm_uid, &mut conn).await?;
+
         Ok(StatusCode::NO_CONTENT)
     }
 
     pub async fn register_device(
         fcm_uid: FcmUid,
         addr: String,
-        repos: Repos,
+        devices: device::Repo,
         pool: Pool,
         device_info: dto::NewDevice,
     ) -> Result<impl Reply, Rejection> {
-        let addr = Address::from_string(&addr).unwrap();
-        let mut conn_lock = pool.get().await.unwrap();
+        let address = Address::from_string(&addr).unwrap(); //TODO Don't unwrap, reply with error to the remote client
 
-        if repos
-            .device
-            .exists(&addr, fcm_uid.clone(), &mut conn_lock)
-            .await?
-        {
+        let mut conn = pool.get().await.unwrap(); //TODO Don't unwrap, handle errors correctly
+
+        if devices.exists(&address, fcm_uid.clone(), &mut conn).await? {
             return Ok(StatusCode::NO_CONTENT);
         }
 
-        repos
-            .device
+        devices
             .register(
-                &addr,
+                &address,
                 fcm_uid,
                 &device_info.lang.language,
                 device_info.tz.utc_offset_seconds,
-                &mut conn_lock,
+                &mut conn,
             )
             .await?;
+
         Ok(StatusCode::CREATED)
     }
 
     pub async fn update_device(
         fcm_uid: FcmUid,
         addr: String,
-        repos: Repos,
+        devices: device::Repo,
         pool: Pool,
         device_info: dto::UpdateDevice,
     ) -> Result<impl Reply, Rejection> {
+        let address = Address::from_string(&addr).unwrap(); //TODO Don't unwrap, reply with error to the remote client
+
         let response = if device_info.fcm.is_some() {
             StatusCode::OK
         } else {
             StatusCode::NO_CONTENT
         };
-        repos
-            .device
+
+        let mut conn = pool.get().await.unwrap(); //TODO Don't unwrap, handle errors correctly
+
+        devices
             .update(
-                &Address::from_string(&addr).unwrap(),
+                &address,
                 fcm_uid,
                 device_info.lang.map(|l| l.language),
                 device_info.tz.map(|tz| tz.utc_offset_seconds),
                 device_info.fcm.map(|fcm| fcm.fcm_uid),
-                &mut pool.get().await.unwrap(),
+                &mut conn,
             )
             .await?;
+
         Ok(response)
     }
 
     pub async fn unsubscribe_from_topics(
         addr: String,
-        repos: Repos,
+        subscriptions: subscription::Repo,
         pool: Pool,
         topics: Option<dto::Topics>,
     ) -> Result<impl Reply, Rejection> {
-        repos
-            .subscriptions
-            .unsubscribe(
-                &Address::from_string(&addr).unwrap(),
-                topics.map(|t| t.topics),
-                &mut pool.get().await.unwrap(),
-            )
+        let address = Address::from_string(&addr).unwrap(); //TODO Don't unwrap, reply with error to the remote client
+
+        let mut conn = pool.get().await.unwrap(); //TODO Don't unwrap, handle errors correctly
+
+        subscriptions
+            .unsubscribe(&address, topics.map(|t| t.topics), &mut conn)
             .await?;
+
         Ok(StatusCode::NO_CONTENT)
     }
 
     pub async fn subscribe_to_topics(
         addr: String,
-        repos: Repos,
+        subscriptions: subscription::Repo,
         pool: Pool,
         topics: dto::Topics,
     ) -> Result<impl Reply, Rejection> {
-        repos
-            .subscriptions
+        let address = Address::from_string(&addr).unwrap(); //TODO Don't unwrap, reply with error to the remote client
+
+        let mut conn = pool.get().await.unwrap(); //TODO Don't unwrap, handle errors correctly
+
+        subscriptions
             .subscribe(
-                &Address::from_string(&addr).unwrap(),
+                &address,
                 topics.topics,
-                SubscriptionMode::Repeat, //todo: find out the right value
-                &mut pool.get().await.unwrap(),
+                SubscriptionMode::Repeat, //TODO Parse from request (with default) - for each topic or for the whole request?
+                &mut conn,
             )
             .await?;
+
         Ok(StatusCode::NO_CONTENT)
     }
-}
-
-#[derive(Clone)]
-pub struct Repos {
-    pub device: device::Repo,
-    pub subscriptions: subscription::Repo,
 }
 
 mod dto {

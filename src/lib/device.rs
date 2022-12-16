@@ -52,7 +52,7 @@ impl Repo {
         address: &Address,
         fcm_uid: FcmUid,
         lang: &str,
-        tz: i32,
+        tz_offset: i32,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         conn.transaction(move |conn| {
@@ -64,7 +64,7 @@ impl Repo {
                     devices::fcm_uid.eq(fcm_uid),
                     devices::subscriber_address.eq(address),
                     devices::language.eq(lang),
-                    devices::utc_offset_seconds.eq(tz),
+                    devices::utc_offset_seconds.eq(tz_offset),
                 );
 
                 diesel::insert_into(devices::table)
@@ -131,7 +131,7 @@ impl Repo {
         address: &Address,
         fcm_uid: FcmUid,
         lang: Option<String>,
-        tz: Option<i32>,
+        tz_offset: Option<i32>,
         new_fcm_uid: Option<FcmUid>,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
@@ -140,6 +140,8 @@ impl Repo {
             let lang = lang.map(|l| l.to_string());
 
             async move {
+                //TODO Performance issue: the following independent queries can be merged into one
+
                 let updater = diesel::update(
                     devices::table
                         .filter(devices::fcm_uid.eq(fcm_uid.clone()))
@@ -164,7 +166,7 @@ impl Repo {
                         .await?;
                 }
 
-                if let Some(tz) = tz {
+                if let Some(tz) = tz_offset {
                     updater
                         .clone()
                         .set(devices::utc_offset_seconds.eq(tz))

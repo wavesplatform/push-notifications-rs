@@ -27,7 +27,6 @@ diesel-async = { version = "0.1", features = ["postgres", "bb8"] }
 anyhow = "1.0"
 itertools = "0.10"
 fcm = "0.9"
-base64 = "0.20.0"
 
 [lib]
 name = "lib"
