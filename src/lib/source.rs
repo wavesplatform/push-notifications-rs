@@ -36,6 +36,7 @@ pub mod prices {
             data_service_url: &str,
             assets: asset::RemoteGateway,
         ) -> Result<(), anyhow::Error> {
+            println!("INFO  | Loading pairs from data-service");
             let pairs = load_pairs(data_service_url, assets).await?;
             for pair in pairs {
                 self.last_prices.insert(pair.pair, pair.last_price);
@@ -166,27 +167,45 @@ mod data_service {
         let pairs = pairs.items;
         let mut res = Vec::with_capacity(pairs.len());
         for pair in pairs.into_iter() {
-            let pair = convert_pair(pair, &assets).await?;
-            res.push(pair);
+            println!(
+                "DEBUG | > Loading pair {} / {}",
+                pair.amount_asset, pair.price_asset
+            );
+            if let Some(pair) = convert_pair(&pair, &assets).await? {
+                res.push(pair);
+            } else {
+                println!(
+                    "WARN  |   ! Skipping pair {} / {} - unable to load decimals",
+                    pair.amount_asset, pair.price_asset
+                );
+            }
         }
         Ok(res)
     }
 
     async fn convert_pair(
-        pair: dto::Pair,
+        pair: &dto::Pair,
         assets: &asset::RemoteGateway,
-    ) -> Result<Pair, anyhow::Error> {
+    ) -> Result<Option<Pair>, anyhow::Error> {
         let amount_asset = Asset::from_id(&pair.amount_asset).expect("amt asset");
         let price_asset = Asset::from_id(&pair.price_asset).expect("price asset");
         let last_price_raw = pair.data.last_price.to_u64().expect("price fits u64");
-        let amount_asset_decimals = assets.decimals(&amount_asset).await? as i16;
-        let price_asset_decimals = assets.decimals(&price_asset).await? as i16;
-        let decimals = 8 + price_asset_decimals - amount_asset_decimals;
-        ensure!(
-            decimals >= 0 && decimals <= 255,
-            "Unexpected price_decimals: {decimals} for asset pair {amount_asset}/{price_asset} ({amount_asset_decimals}/{price_asset_decimals})"
-        );
-        let price_decimals = decimals as u8; // Cast is safe due to the check above
+        let price_decimals = {
+            let amount_asset_decimals = assets.decimals(&amount_asset).await?.map(|x| x as i16);
+            let price_asset_decimals = assets.decimals(&price_asset).await?.map(|x| x as i16);
+            if let (Some(amount_asset_decimals), Some(price_asset_decimals)) =
+                (amount_asset_decimals, price_asset_decimals)
+            {
+                let decimals = 8 + price_asset_decimals - amount_asset_decimals;
+                ensure!(
+                    decimals >= 0 && decimals <= 255,
+                    "Unexpected price_decimals: {decimals} for asset pair {amount_asset}/{price_asset} ({amount_asset_decimals}/{price_asset_decimals})"
+                );
+                decimals as u8 // Cast is safe due to the check above
+            } else {
+                return Ok(None);
+            }
+        };
         let pair = Pair {
             pair: AssetPair {
                 amount_asset,
@@ -197,7 +216,7 @@ mod data_service {
                 decimals: price_decimals,
             },
         };
-        Ok(pair)
+        Ok(Some(pair))
     }
 }
 
