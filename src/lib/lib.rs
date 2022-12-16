@@ -6,9 +6,11 @@ extern crate async_trait;
 #[macro_use]
 extern crate diesel;
 
+pub mod api;
 pub mod asset;
 pub mod backoff;
 pub mod config;
+pub mod db;
 pub mod device;
 pub mod localization;
 pub mod message;

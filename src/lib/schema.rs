@@ -8,6 +8,7 @@ diesel::table! {
         fcm_uid -> Varchar,
         subscriber_address -> Varchar,
         language -> Varchar,
+        utc_offset_seconds -> Int4,
     }
 }
 

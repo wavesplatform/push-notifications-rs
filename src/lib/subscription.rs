@@ -50,6 +50,7 @@ impl Topic {
     }
 }
 
+#[derive(Clone)]
 pub struct Repo {}
 
 impl Repo {
@@ -139,6 +140,59 @@ impl Repo {
         .execute(conn)
         .await?;
         debug_assert_eq!(num_rows, 1); //TODO return warning?
+        Ok(())
+    }
+
+    pub async fn subscribe(
+        &self,
+        address: &Address,
+        topics: Vec<String>,
+        topic_type: SubscriptionMode,
+        conn: &mut AsyncPgConnection,
+    ) -> Result<(), Error> {
+        let values = topics
+            .into_iter()
+            .map(|topic| {
+                (
+                    subscriptions::subscriber_address.eq(address.as_base58_string()),
+                    subscriptions::topic.eq(topic),
+                    subscriptions::topic_type.eq(topic_type as i32),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        diesel::insert_into(subscriptions::table)
+            .values(values)
+            .on_conflict_do_nothing()
+            .execute(conn)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn unsubscribe(
+        &self,
+        address: &Address,
+        topics: Option<Vec<String>>,
+        conn: &mut AsyncPgConnection,
+    ) -> Result<(), Error> {
+        if let Some(topics) = topics {
+            diesel::delete(
+                subscriptions::table
+                    .filter(subscriptions::subscriber_address.eq(address.as_base58_string()))
+                    .filter(subscriptions::topic.eq_any(topics)),
+            )
+            .execute(conn)
+            .await?;
+        } else {
+            diesel::delete(
+                subscriptions::table
+                    .filter(subscriptions::subscriber_address.eq(address.as_base58_string())),
+            )
+            .execute(conn)
+            .await?;
+        }
+
         Ok(())
     }
 }
