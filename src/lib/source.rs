@@ -180,10 +180,10 @@ mod data_service {
         let last_price_raw = pair.data.last_price.to_u64().expect("price fits u64");
         let amount_asset_decimals = assets.decimals(&amount_asset).await? as i16;
         let price_asset_decimals = assets.decimals(&price_asset).await? as i16;
-        let decimals = -8 - amount_asset_decimals + price_asset_decimals;
+        let decimals = 8 + price_asset_decimals - amount_asset_decimals;
         ensure!(
-            decimals >= 0 && decimals <= 256,
-            "Unexpected price_decimals: {decimals} for asset pair {amount_asset}/{price_asset}"
+            decimals >= 0 && decimals <= 255,
+            "Unexpected price_decimals: {decimals} for asset pair {amount_asset}/{price_asset} ({amount_asset_decimals}/{price_asset_decimals})"
         );
         let price_decimals = decimals as u8; // Cast is safe due to the check above
         let pair = Pair {
