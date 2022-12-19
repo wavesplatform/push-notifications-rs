@@ -1,3 +1,7 @@
+//! Push notifications Processor service executable
+
+extern crate wavesexchange_log as log;
+
 use std::sync::Arc;
 
 use diesel_async::{AsyncConnection, AsyncPgConnection};
@@ -16,6 +20,12 @@ async fn main() -> Result<(), anyhow::Error> {
     // Configs
     let pg_config = postgres::Config::load()?;
     let config = processor::Config::load()?;
+
+    log::info!(
+        "Starting push-notifications processor service with config {:?}, postgres {:?}",
+        config,
+        pg_config
+    );
 
     // Database
     let conn = AsyncPgConnection::establish(&pg_config.database_url()).await?;

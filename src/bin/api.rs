@@ -1,5 +1,8 @@
+//! Push notifications API service executable
+
+extern crate wavesexchange_log as log;
+
 use lib::{api, config, db, device, subscription, Error};
-use wavesexchange_log::info;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -11,9 +14,10 @@ async fn main() -> Result<(), Error> {
     let devices = device::Repo {};
     let subscriptions = subscription::Repo {};
 
-    info!(
-        "Starting push-notifications api service with config: {:?}",
-        config
+    log::info!(
+        "Starting push-notifications api service with config {:?}, postgres {:?}",
+        config,
+        pg_config
     );
 
     api::start(

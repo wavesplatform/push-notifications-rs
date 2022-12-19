@@ -4,7 +4,6 @@ use serde_json::{from_slice, Value};
 use std::sync::Arc;
 use tokio::sync::Mutex as AsyncMutex;
 use warp::{reject, Filter, Rejection};
-use wavesexchange_log::{error, info};
 use wavesexchange_warp::{
     error::{error_handler_with_serde_qs, handler, internal, validation},
     log::access,
@@ -88,7 +87,7 @@ pub async fn start(
 
     let log = warp::log::custom(access);
 
-    info!("Starting push-notifications API server at 0.0.0.0:{}", port);
+    log::info!("Starting push-notifications API server at 0.0.0.0:{}", port);
 
     let routes = device_unregister
         .or(device_update)
@@ -96,7 +95,7 @@ pub async fn start(
         .or(topic_subscribe)
         .or(topic_unsubscribe)
         .recover(move |rej| {
-            error!("{:?}", rej);
+            log::error!("{:?}", rej);
             error_handler_with_serde_qs(ERROR_CODES_PREFIX, error_handler.clone())(rej)
         })
         .with(log);
