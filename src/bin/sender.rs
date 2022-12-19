@@ -1,31 +1,40 @@
 use chrono::{DateTime, Utc};
 use diesel::{prelude::*, Connection, PgConnection};
-use lib::{backoff, config::Config, Error};
+use lib::{
+    backoff,
+    config::{self, sender},
+    Error,
+};
 use wavesexchange_log::{debug, error, info};
 
 // todo proper logging
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let config = Config::load()?;
-    debug!("Sender started with config {:?}", config);
+    // Configs
+    let pg_config = config::postgres::Config::load()?;
+    let config = sender::Config::load()?;
+    debug!(
+        "Sender started with config {:?}, postgres {:?}",
+        config, pg_config
+    );
 
-    let mut conn = PgConnection::establish(&config.postgres.database_url())?;
+    let mut conn = PgConnection::establish(&pg_config.database_url())?;
 
     loop {
-        let message_to_send = postgres::dequeue(&mut conn, config.sender.send_max_attempts as i16)?;
+        let message_to_send = postgres::dequeue(&mut conn, config.send_max_attempts as i16)?;
 
         match message_to_send {
             None => {
                 debug!(
                     "No messages, sleep for {:?}s",
-                    config.sender.empty_queue_poll_period.num_seconds()
+                    config.empty_queue_poll_period.num_seconds()
                 );
-                tokio::time::sleep(config.sender.empty_queue_poll_period.to_std().unwrap()).await;
+                tokio::time::sleep(config.empty_queue_poll_period.to_std().unwrap()).await;
                 // .unwrap() is safe, non-negativity is validated on config load (u32)
             }
             Some(message) => {
-                let fcm_msg = formatter::message(&config.sender.fcm_api_key, &message);
+                let fcm_msg = formatter::message(&config.fcm_api_key, &message);
                 // todo ttl
 
                 match Ok::<fcm::Message, fcm::FcmError>(fcm_msg).map(|_| ()) {
@@ -39,8 +48,8 @@ async fn main() -> Result<(), Error> {
                         error!("Failed to send message {} | {:?}", message.uid, err);
 
                         let backoff_interval = backoff::exponential(
-                            &config.sender.exponential_backoff_initial_interval,
-                            config.sender.exponential_backoff_multiplier,
+                            &config.exponential_backoff_initial_interval,
+                            config.exponential_backoff_multiplier,
                             message.send_attempts_count,
                         );
 

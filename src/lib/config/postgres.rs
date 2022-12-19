@@ -1,8 +1,8 @@
+//! Postgres database config
+
+use std::fmt;
+
 use serde::Deserialize;
-use std::{
-    fmt,
-    fmt::{Debug, Formatter},
-};
 
 use crate::error::Error;
 
@@ -33,8 +33,8 @@ impl Config {
     }
 }
 
-impl Debug for Config {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl fmt::Debug for Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Intentionally avoid printing password for security reasons
         write!(
             f,

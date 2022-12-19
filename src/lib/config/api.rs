@@ -1,3 +1,5 @@
+//! Push notifications API config
+
 use serde::Deserialize;
 
 use crate::error::Error;

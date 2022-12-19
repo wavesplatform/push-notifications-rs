@@ -1,10 +1,11 @@
-use crate::error::Error;
+//! Push notifications Sender config
+
+use std::fmt;
+
 use chrono::Duration;
 use serde::Deserialize;
-use std::{
-    fmt,
-    fmt::{Debug, Formatter},
-};
+
+use crate::error::Error;
 
 #[derive(Clone)]
 pub struct Config {
@@ -66,8 +67,8 @@ fn default_send_max_attempts() -> u8 {
     5
 }
 
-impl Debug for Config {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl fmt::Debug for Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Intentionally avoid printing FCM API Key for security reasons
         write!(
             f,
