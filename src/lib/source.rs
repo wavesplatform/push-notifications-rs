@@ -50,7 +50,9 @@ pub mod prices {
             starting_height: u32,
             sink: mpsc::Sender<EventWithFeedback>,
         ) -> Result<(), anyhow::Error> {
+            log::debug!("Connecting to blockchain-updates: {}", blockchain_updates_url);
             let client = BlockchainUpdatesClient::connect(blockchain_updates_url).await?;
+            log::debug!("Starting receiving blockchain updates from height {}", starting_height);
             let mut stream = client.stream(starting_height).await?;
             while let Some(upd) = stream.recv().await {
                 match upd {
@@ -60,7 +62,7 @@ pub mod prices {
                             Ok(()) => {}
                             Err(Error::StopProcessing) => break,
                             Err(Error::EventProcessingFailed(err)) => {
-                                log::error!("Event processing failed: {err:?}");
+                                log::error!("Event processing failed: {}", err);
                                 return Err(err.into());
                             }
                         }
@@ -68,6 +70,7 @@ pub mod prices {
                     BlockchainUpdate::Rollback(_) => {}
                 }
             }
+            log::debug!("Blockchain updates loop finished");
             Ok(())
         }
 
@@ -76,6 +79,7 @@ pub mod prices {
             block: AppendBlock,
             sink: &mpsc::Sender<EventWithFeedback>,
         ) -> Result<(), Error> {
+            //log::trace!("Processing block {} at height {}", block.block_id, block.height);
             let block_prices = self.aggregate_prices_from_block(block);
             self.send_price_events(block_prices, sink).await
         }
