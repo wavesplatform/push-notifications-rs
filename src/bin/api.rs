@@ -1,11 +1,12 @@
-use lib::{api, config::Config, db, device, subscription, Error};
+use lib::{api, config, db, device, subscription, Error};
 use wavesexchange_log::info;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let config = Config::load()?;
+    let pg_config = config::postgres::Config::load()?;
+    let config = config::api::Config::load()?;
 
-    let pool = db::async_pool(&config.postgres).await?;
+    let pool = db::async_pool(&pg_config).await?;
 
     let devices = device::Repo {};
     let subscriptions = subscription::Repo {};
@@ -16,8 +17,8 @@ async fn main() -> Result<(), Error> {
     );
 
     api::start(
-        config.api.port,
-        config.api.metrics_port,
+        config.port,
+        config.metrics_port,
         devices,
         subscriptions,
         pool,

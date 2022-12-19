@@ -1,4 +1,4 @@
-use crate::{config::Config, db::PgAsyncPool, device, model::Address, subscription, Error};
+use crate::{db::PgAsyncPool, device, model::Address, subscription, Error};
 use diesel_async::{AsyncConnection, AsyncPgConnection};
 use serde_json::{from_slice, Value};
 use std::sync::Arc;

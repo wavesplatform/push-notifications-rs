@@ -1,13 +1,13 @@
 use diesel::migration::Migration;
 use diesel::{migration, pg::PgConnection, Connection};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use lib::config::postgres::Config;
+use lib::config::postgres;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 fn main() -> anyhow::Result<()> {
     let action = action::parse_command_line()?;
-    let dbconfig = Config::load()?;
+    let dbconfig = postgres::Config::load()?;
     let conn = PgConnection::establish(&dbconfig.database_url())?;
     run(action, conn).map_err(|e| anyhow::anyhow!(e))
 }
