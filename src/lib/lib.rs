@@ -6,6 +6,8 @@ extern crate async_trait;
 #[macro_use]
 extern crate diesel;
 
+extern crate wavesexchange_log as log;
+
 pub mod api;
 pub mod asset;
 pub mod backoff;

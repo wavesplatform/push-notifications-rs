@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::{error::Error, model::Address};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Config {
     pub assets_service_url: String,
     pub lokalise_sdk_token: String,

@@ -1,3 +1,7 @@
+//! Push notifications Processor service executable
+
+extern crate wavesexchange_log as log;
+
 use std::sync::Arc;
 
 use diesel_async::{AsyncConnection, AsyncPgConnection};
@@ -17,10 +21,14 @@ async fn main() -> Result<(), anyhow::Error> {
     let pg_config = postgres::Config::load()?;
     let config = processor::Config::load()?;
 
+    log::info!("Starting push-notifications processor service with {:?}", config);
+
     // Database
+    log::info!("Connecting to postgres database: {:?}", pg_config);
     let conn = AsyncPgConnection::establish(&pg_config.database_url()).await?;
 
     // Repo
+    log::info!("Initializing repositories");
     let subscriptions = subscription::Repo {};
     let assets = asset::RemoteGateway::new(config.assets_service_url);
     let devices = device::Repo {};
@@ -28,6 +36,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let messages = message::Queue {};
 
     // Create event sources
+    log::info!("Initializing event sources");
     let mut prices_source = source::prices::Source::new(config.matcher_address);
     prices_source
         .init_prices(&config.data_service_url, assets.clone())
@@ -37,6 +46,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let (events_tx, events_rx) = mpsc::channel(100); // buffer size is rather arbitrary
 
     // Start event sources
+    log::info!("Starting event sources");
     prices_source
         .start(
             config.blockchain_updates_url,
@@ -46,6 +56,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .await?;
 
     // Event processor
+    log::info!("Initialization finished, starting service");
     let processor = MessagePump::new(subscriptions, assets, devices, localizer, messages);
     let processor = Arc::new(processor);
     processor.run_event_loop(events_rx, conn).await;

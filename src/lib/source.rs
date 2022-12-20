@@ -36,7 +36,7 @@ pub mod prices {
             data_service_url: &str,
             assets: asset::RemoteGateway,
         ) -> Result<(), anyhow::Error> {
-            println!("INFO  | Loading pairs from data-service");
+            log::info!("Loading pairs from data-service");
             let pairs = load_pairs(data_service_url, assets).await?;
             for pair in pairs {
                 self.last_prices.insert(pair.pair, pair.last_price);
@@ -50,7 +50,9 @@ pub mod prices {
             starting_height: u32,
             sink: mpsc::Sender<EventWithFeedback>,
         ) -> Result<(), anyhow::Error> {
+            log::debug!("Connecting to blockchain-updates: {}", blockchain_updates_url);
             let client = BlockchainUpdatesClient::connect(blockchain_updates_url).await?;
+            log::debug!("Starting receiving blockchain updates from height {}", starting_height);
             let mut stream = client.stream(starting_height).await?;
             while let Some(upd) = stream.recv().await {
                 match upd {
@@ -60,7 +62,7 @@ pub mod prices {
                             Ok(()) => {}
                             Err(Error::StopProcessing) => break,
                             Err(Error::EventProcessingFailed(err)) => {
-                                println!("ERROR | Event processing failed: {err:?}");
+                                log::error!("Event processing failed: {}", err);
                                 return Err(err.into());
                             }
                         }
@@ -68,6 +70,7 @@ pub mod prices {
                     BlockchainUpdate::Rollback(_) => {}
                 }
             }
+            log::debug!("Blockchain updates loop finished");
             Ok(())
         }
 
@@ -76,6 +79,7 @@ pub mod prices {
             block: AppendBlock,
             sink: &mpsc::Sender<EventWithFeedback>,
         ) -> Result<(), Error> {
+            //log::trace!("Processing block {} at height {}", block.block_id, block.height);
             let block_prices = self.aggregate_prices_from_block(block);
             self.send_price_events(block_prices, sink).await
         }
@@ -162,21 +166,20 @@ mod data_service {
         data_service_url: &str,
         assets: asset::RemoteGateway,
     ) -> Result<Vec<Pair>, anyhow::Error> {
+        log::timer!("Pairs loading", level = info);
         let client = HttpClient::<DataService>::from_base_url(data_service_url);
         let pairs = client.pairs().await?;
         let pairs = pairs.items;
         let mut res = Vec::with_capacity(pairs.len());
         for pair in pairs.into_iter() {
-            println!(
-                "DEBUG | > Loading pair {} / {}",
-                pair.amount_asset, pair.price_asset
-            );
+            log::debug!("Loading pair {} / {}", pair.amount_asset, pair.price_asset);
             if let Some(pair) = convert_pair(&pair, &assets).await? {
                 res.push(pair);
             } else {
-                println!(
-                    "WARN  |   ! Skipping pair {} / {} - unable to load decimals",
-                    pair.amount_asset, pair.price_asset
+                log::warn!(
+                    "Skipping pair {} / {} - unable to load decimals",
+                    pair.amount_asset,
+                    pair.price_asset
                 );
             }
         }
@@ -220,7 +223,6 @@ mod data_service {
     }
 }
 
-//TODO proper logging
 mod blockchain_updates {
     use tokio::{
         sync::{mpsc, oneshot},
@@ -301,9 +303,9 @@ mod blockchain_updates {
             task::spawn(async move {
                 let res = pump_messages(stream, tx).await;
                 if let Err(err) = res {
-                    println!("ERROR | Error receiving blockchain updates: {}", err);
+                    log::error!("Error receiving blockchain updates: {}", err);
                 } else {
-                    println!("WARN  | GRPC connection closed by the server");
+                    log::warn!("GRPC connection closed by the server");
                 }
             });
 

@@ -1,3 +1,7 @@
+//! Push notifications Sender service executable
+
+extern crate wavesexchange_log as log;
+
 use chrono::{DateTime, Utc};
 use diesel::{prelude::*, Connection, PgConnection};
 use lib::{
@@ -5,20 +9,15 @@ use lib::{
     config::{self, sender},
     Error,
 };
-use wavesexchange_log::{debug, error, info};
-
-// todo proper logging
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     // Configs
     let pg_config = config::postgres::Config::load()?;
     let config = sender::Config::load()?;
-    debug!(
-        "Sender started with config {:?}, postgres {:?}",
-        config, pg_config
-    );
+    log::info!("Starting push-notifications sender service with {:?}", config);
 
+    log::info!("Connecting to postgres database: {:?}", pg_config);
     let mut conn = PgConnection::establish(&pg_config.database_url())?;
 
     loop {
@@ -26,7 +25,7 @@ async fn main() -> Result<(), Error> {
 
         match message_to_send {
             None => {
-                debug!(
+                log::debug!(
                     "No messages, sleep for {:?}s",
                     config.empty_queue_poll_period.num_seconds()
                 );
@@ -38,14 +37,14 @@ async fn main() -> Result<(), Error> {
                 // todo ttl
 
                 match Ok::<fcm::Message, fcm::FcmError>(fcm_msg).map(|_| ()) {
-                // match fcm::Client::new().send(fcm_msg).await.map(|_| ()) {
+                    // match fcm::Client::new().send(fcm_msg).await.map(|_| ()) {
                     Ok(()) => {
-                        info!("SENT message {}", message.uid);
+                        log::info!("SENT message {}", message.uid);
                         postgres::ack(&mut conn, message.uid)?;
-                        debug!("Message {} deleted from DB", message.uid);
+                        log::debug!("Message {} deleted from DB", message.uid);
                     }
                     Err(err) => {
-                        error!("Failed to send message {} | {:?}", message.uid, err);
+                        log::error!("Failed to send message {} | {:?}", message.uid, err);
 
                         let backoff_interval = backoff::exponential(
                             &config.exponential_backoff_initial_interval,
@@ -63,7 +62,7 @@ async fn main() -> Result<(), Error> {
                             scheduled_for,
                         )?;
 
-                        debug!(
+                        log::debug!(
                             "Message {} rescheduled for {:?} folowing backoff of {}s",
                             message.uid,
                             scheduled_for,
