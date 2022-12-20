@@ -11,7 +11,7 @@ type Decimals = u8;
 #[derive(Debug, Clone)]
 struct LocalAssetInfo {
     ticker: Option<Ticker>,
-    decimals: Option<Decimals>,
+    decimals: Decimals,
 }
 
 #[derive(Clone)]
@@ -29,7 +29,7 @@ impl RemoteGateway {
         self.asset_info(asset).await.map(|a| a.ticker)
     }
 
-    pub async fn decimals(&self, asset: &Asset) -> Result<Option<Decimals>, Error> {
+    pub async fn decimals(&self, asset: &Asset) -> Result<Decimals, Error> {
         self.load(asset.to_owned()).await.map_err(Error::from)
     }
 
@@ -39,12 +39,12 @@ impl RemoteGateway {
 }
 
 #[async_trait]
-impl CachedLoader<Asset, Option<Decimals>> for RemoteGateway {
-    type Cache = UnboundCache<Asset, Option<Decimals>>;
+impl CachedLoader<Asset, Decimals> for RemoteGateway {
+    type Cache = UnboundCache<Asset, Decimals>;
 
     type Error = Error;
 
-    async fn load_fn(&mut self, keys: &[Asset]) -> Result<Vec<Option<Decimals>>, Self::Error> {
+    async fn load_fn(&mut self, keys: &[Asset]) -> Result<Vec<Decimals>, Self::Error> {
         let mut result = vec![];
         for asset in keys {
             let asset = self.asset_info(asset).await?;
@@ -78,17 +78,13 @@ impl CachedLoader<Asset, LocalAssetInfo> for RemoteGateway {
             let asset = match asset.data {
                 Some(AssetInfo::Full(a)) => LocalAssetInfo {
                     ticker: a.ticker,
-                    decimals: Some(a.precision as u8),
+                    decimals: a.precision as u8,
                 },
                 Some(AssetInfo::Brief(_)) => {
                     unreachable!("Full info expected")
                 }
                 None => {
-                    //panic!("No AssetInfo for asset {}", asset_id);
-                    LocalAssetInfo {
-                        ticker: None,
-                        decimals: None,
-                    }
+                    panic!("No AssetInfo for asset {}", asset_id);
                 }
             };
             result.push(asset);
