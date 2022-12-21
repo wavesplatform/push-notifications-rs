@@ -14,16 +14,23 @@ use crate::{
 };
 
 pub struct Subscription {
+    pub uid: i32,
     pub subscriber: Address,
     pub created_at: DateTime<Utc>,
     pub mode: SubscriptionMode,
     pub topic: Topic,
 }
 
+pub struct SubscriptionRequest {
+    pub topic_url: String,
+    pub topic: Topic,
+    pub mode: SubscriptionMode,
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum SubscriptionMode {
-    Once = 0,
-    Repeat = 1,
+    Once,
+    Repeat,
 }
 
 pub enum Topic {
@@ -46,10 +53,17 @@ impl SubscriptionMode {
             _ => panic!("unknown subscription mode {mode}"),
         }
     }
+
+    fn to_int(&self) -> u8 {
+        match self {
+            SubscriptionMode::Once => 0,
+            SubscriptionMode::Repeat => 1,
+        }
+    }
 }
 
 impl Topic {
-    fn from_url_string(topic_url_raw: &str) -> Result<(Self, SubscriptionMode), Error> {
+    pub fn from_url_string(topic_url_raw: &str) -> Result<(Self, SubscriptionMode), Error> {
         enum TopicKind {
             Orders,
             PriceThreshold,
@@ -141,17 +155,6 @@ impl Topic {
             }
         }
     }
-
-    fn as_url_string(&self) -> String {
-        match self {
-            Topic::OrderFulfilled { .. } => "push://orders".to_string(),
-            Topic::PriceThreshold {
-                amount_asset,
-                price_asset,
-                price_threshold,
-            } => format!("push://price_threshold/{amount_asset}/{price_asset}/{price_threshold}",),
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -201,6 +204,7 @@ impl Repo {
                     .on(topics_price_threshold::subscription_uid.eq(subscriptions::uid)),
             )
             .select((
+                subscriptions::uid,
                 subscriptions::subscriber_address,
                 subscriptions::created_at,
                 subscriptions::topic_type,
@@ -210,12 +214,13 @@ impl Repo {
             .filter(topics_price_threshold::price_asset_id.eq(price_asset_id))
             .filter(topics_price_threshold::price_threshold.between(price_low, price_high))
             .order(subscriptions::uid)
-            .load::<(String, DateTime<Utc>, i32, String)>(conn)
+            .load::<(i32, String, DateTime<Utc>, i32, String)>(conn)
             .await?;
 
         rows.into_iter()
-            .map(|(address, created_at, topic_type, topic)| {
+            .map(|(uid, address, created_at, topic_type, topic)| {
                 Ok(Subscription {
+                    uid,
                     subscriber: Address::from_string(&address).expect("address in db"),
                     created_at,
                     mode: SubscriptionMode::from_int(topic_type as u8),
@@ -231,17 +236,10 @@ impl Repo {
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         debug_assert_eq!(subscription.mode, SubscriptionMode::Once);
-        let address = subscription.subscriber.as_base58_string();
-        let topic = subscription.topic.as_url_string();
-        let num_rows = diesel::delete(
-            subscriptions::table
-                //.filter(subscriptions::uid.eq(subscription.uid)) //TODO delete by uid or by primary key?
-                .filter(subscriptions::subscriber_address.eq(address))
-                .filter(subscriptions::topic.eq(topic))
-                .filter(subscriptions::topic_type.eq(SubscriptionMode::Once as i32)),
-        )
-        .execute(conn)
-        .await?;
+        let num_rows =
+            diesel::delete(subscriptions::table.filter(subscriptions::uid.eq(subscription.uid)))
+                .execute(conn)
+                .await?;
         debug_assert_eq!(num_rows, 1); //TODO return warning?
         Ok(())
     }
@@ -249,55 +247,48 @@ impl Repo {
     pub async fn subscribe(
         &self,
         address: &Address,
-        topic_urls: Vec<String>,
+        subscriptions: Vec<SubscriptionRequest>,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
-        let topics = topic_urls
-            .into_iter()
-            .map(|t| Topic::from_url_string(&t))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let rows = topics
-            .into_iter()
-            .map(|(topic, subscr_mode)| {
+        let rows = subscriptions
+            .iter()
+            .map(|subscr| {
                 (
                     subscriptions::subscriber_address.eq(address.as_base58_string()),
-                    subscriptions::topic.eq(topic.as_url_string()),
-                    subscriptions::topic_type.eq(subscr_mode as i32),
+                    subscriptions::topic.eq(subscr.topic_url.clone()),
+                    subscriptions::topic_type.eq(subscr.mode.to_int() as i32),
                 )
             })
             .collect::<Vec<_>>();
 
         conn.transaction(move |conn| {
             async move {
-                let topic_uids_urls: Vec<(i32, String)> = diesel::insert_into(subscriptions::table)
+                let uids = diesel::insert_into(subscriptions::table)
                     .values(rows)
                     .on_conflict_do_nothing()
-                    .returning((subscriptions::uid, subscriptions::topic))
-                    .get_results(conn)
+                    .returning(subscriptions::uid)
+                    .get_results::<i32>(conn)
                     .await?;
 
-                let new_price_threshold_topics = topic_uids_urls
-                    .into_iter()
-                    .filter_map(|(uid, topic_url)| {
-                        let (topic, _) =
-                            Topic::from_url_string(&topic_url).expect("topic url corrupted");
+                let subscr_with_uids = subscriptions.iter().zip(uids.into_iter());
 
+                let new_price_threshold_topics = subscr_with_uids
+                    .filter(|&(subscr, _uid)| matches!(subscr.topic, Topic::PriceThreshold { .. }))
+                    .map(|(subscr, uid)| {
                         if let Topic::PriceThreshold {
                             amount_asset,
                             price_asset,
                             price_threshold,
-                        } = topic
+                        } = &subscr.topic
                         {
-                            let row = (
+                            (
                                 topics_price_threshold::subscription_uid.eq(uid),
                                 topics_price_threshold::amount_asset_id.eq(amount_asset.id()),
                                 topics_price_threshold::price_asset_id.eq(price_asset.id()),
                                 topics_price_threshold::price_threshold.eq(price_threshold),
-                            );
-                            Some(row)
+                            )
                         } else {
-                            None
+                            unreachable!("broken filter by topic type")
                         }
                     })
                     .collect::<Vec<_>>();
