@@ -111,7 +111,8 @@ mod controllers {
     use crate::{
         device::{self, FcmUid},
         model::Address,
-        subscription, Error,
+        subscription::{self, SubscriptionRequest, Topic},
+        Error,
     };
     use warp::{http::StatusCode, Rejection, Reply};
 
@@ -218,11 +219,22 @@ mod controllers {
         let address =
             Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
 
+        let subs = topics
+            .topics
+            .into_iter()
+            .map(|topic_url| {
+                let (topic, mode) = Topic::from_url_string(&topic_url)?;
+                Ok(SubscriptionRequest {
+                    topic_url,
+                    topic,
+                    mode,
+                })
+            })
+            .collect::<Result<Vec<SubscriptionRequest>, Error>>()?;
+
         let mut conn = pool.get().await.map_err(Error::from)?;
 
-        subscriptions
-            .subscribe(&address, topics.topics, &mut conn)
-            .await?;
+        subscriptions.subscribe(&address, subs, &mut conn).await?;
 
         Ok(StatusCode::NO_CONTENT)
     }
