@@ -8,8 +8,6 @@ use crate::{
 };
 use wavesexchange_apis::HttpClient;
 
-const PROJECT_ID: &str = "8193754062287cbb2742a0.58698490";
-
 mod lokalise_keys {
     pub const ORDER_FILLED_TITLE: &str = "orderFilledTitle";
     pub const ORDER_FILLED_MSG: &str = "orderFilledMessage";
@@ -27,11 +25,11 @@ impl RemoteGateway {
         RemoteGateway { lokalise_client }
     }
 
-    pub async fn keys(&self) -> Result<dto::KeysResponse, Error> {
+    pub async fn keys_for_project(&self, project_id: &str) -> Result<dto::KeysResponse, Error> {
         self.lokalise_client
             .create_req_handler::<dto::KeysResponse>(
                 self.lokalise_client
-                    .http_get(format!("projects/{PROJECT_ID}/keys?include_translations=1",)),
+                    .http_get(format!("projects/{project_id}/keys?include_translations=1",)),
                 "lokalise::get",
             )
             .execute()
@@ -40,7 +38,7 @@ impl RemoteGateway {
     }
 }
 
-pub mod dto {
+mod dto {
     use serde::Deserialize;
 
     #[derive(Debug, Clone, Deserialize)]
@@ -87,16 +85,22 @@ pub mod dto {
     }
 }
 
-// {key: {lang: value}}
-type TranslationMap = HashMap<String, HashMap<Lang, String>>;
+type Key = String;
+type Value = String;
+type TranslationMap = HashMap<Key, HashMap<Lang, Value>>;
 
 pub struct Repo {
     translations: TranslationMap,
 }
 
+pub struct LokaliseConfig {
+    pub token: String,
+    pub project_id: String,
+}
+
 impl Repo {
-    pub async fn new(lokalise_sdk_token: impl Into<String>) -> Result<Self, Error> {
-        let auth_header = HashMap::from([("X-Api-Token".to_string(), lokalise_sdk_token.into())]);
+    pub async fn new(config: LokaliseConfig) -> Result<Self, Error> {
+        let auth_header = HashMap::from([("X-Api-Token".to_string(), config.token)]);
 
         let lokalise_client = HttpClient::<()>::builder()
             .with_base_url("https://api.lokalise.co/api2")
@@ -104,7 +108,7 @@ impl Repo {
             .build();
 
         let remote_gateway = RemoteGateway { lokalise_client };
-        let keys = remote_gateway.keys().await?;
+        let keys = remote_gateway.keys_for_project(&config.project_id).await?;
         let mut translations: TranslationMap = HashMap::new();
 
         for key in keys.keys {
@@ -119,6 +123,8 @@ impl Repo {
                 }
             }
         }
+
+        log::trace!("Lokalise translations: {:?}", translations);
 
         Ok(Self { translations })
     }

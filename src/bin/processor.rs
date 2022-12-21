@@ -21,7 +21,15 @@ async fn main() -> Result<(), anyhow::Error> {
     let pg_config = postgres::Config::load()?;
     let config = processor::Config::load()?;
 
-    log::info!("Starting push-notifications processor service with {:?}", config);
+    log::info!(
+        "Starting push-notifications processor service with {:?}",
+        config
+    );
+
+    let lokalise_config = localization::LokaliseConfig {
+        token: config.lokalise_token,
+        project_id: config.lokalise_project_id,
+    };
 
     // Database
     log::info!("Connecting to postgres database: {:?}", pg_config);
@@ -32,7 +40,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let subscriptions = subscription::Repo {};
     let assets = asset::RemoteGateway::new(config.assets_service_url);
     let devices = device::Repo {};
-    let localizer = localization::Repo::new(config.lokalise_sdk_token).await?;
+    let localizer = localization::Repo::new(lokalise_config).await?;
     let messages = message::Queue {};
 
     // Create event sources
