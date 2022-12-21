@@ -11,6 +11,8 @@ pub type Lang = String;
 
 use waves_rust::model::ByteString;
 
+use crate::Error;
+
 pub trait AsBase58String {
     fn as_base58_string(&self) -> String;
 }

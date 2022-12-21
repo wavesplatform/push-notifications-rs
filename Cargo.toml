@@ -32,6 +32,7 @@ tonic = "0.5"
 waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", tag = "v1.4.3" }
 bs58 = "0.4"
 bigdecimal = "0.1"
+bb8 = "0.8.0"
 
 #TODO This crate is not needed directly, but it is here, with a specific version, to fix the build of `waves-rust` crate.
 #TODO Remove it when `waves-rust` > 0.2.2 will fix its dependency on this.

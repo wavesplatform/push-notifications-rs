@@ -1,9 +1,7 @@
-use crate::{db::PgAsyncPool, device, model::Address, subscription, Error};
-use diesel_async::{AsyncConnection, AsyncPgConnection};
-use serde_json::{from_slice, Value};
+use crate::{db::PgAsyncPool, device, subscription, Error};
 use std::sync::Arc;
-use tokio::sync::Mutex as AsyncMutex;
-use warp::{reject, Filter, Rejection};
+use warp::Filter;
+use wavesexchange_log::{error, info};
 use wavesexchange_warp::{
     error::{error_handler_with_serde_qs, handler, internal, validation},
     log::access,
@@ -113,9 +111,8 @@ mod controllers {
     use crate::{
         device::{self, FcmUid},
         model::Address,
-        subscription::{self, SubscriptionMode},
+        subscription, Error,
     };
-    use chrono::FixedOffset;
     use warp::{http::StatusCode, Rejection, Reply};
 
     pub async fn unregister_device(
@@ -124,12 +121,12 @@ mod controllers {
         devices: device::Repo,
         pool: Pool,
     ) -> Result<impl Reply, Rejection> {
-        let address = Address::from_string(&addr).unwrap(); //TODO Don't unwrap, reply with error to the remote client
+        let address =
+            Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
 
-        let mut conn = pool.get().await.unwrap(); //TODO Don't unwrap, handle errors correctly
+        let mut conn = pool.get().await.map_err(Error::from)?;
 
         devices.unregister(&address, fcm_uid, &mut conn).await?;
-
         Ok(StatusCode::NO_CONTENT)
     }
 
@@ -140,11 +137,12 @@ mod controllers {
         pool: Pool,
         device_info: dto::NewDevice,
     ) -> Result<impl Reply, Rejection> {
-        let address = Address::from_string(&addr).unwrap(); //TODO Don't unwrap, reply with error to the remote client
+        let address =
+            Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
 
-        let mut conn = pool.get().await.unwrap(); //TODO Don't unwrap, handle errors correctly
+        let mut conn = pool.get().await.map_err(Error::from)?;
 
-        if devices.exists(&address, fcm_uid.clone(), &mut conn).await? {
+        if devices.exists(&address, &mut conn).await? {
             return Ok(StatusCode::NO_CONTENT);
         }
 
@@ -168,7 +166,8 @@ mod controllers {
         pool: Pool,
         device_info: dto::UpdateDevice,
     ) -> Result<impl Reply, Rejection> {
-        let address = Address::from_string(&addr).unwrap(); //TODO Don't unwrap, reply with error to the remote client
+        let address =
+            Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
 
         let response = if device_info.fcm.is_some() {
             StatusCode::OK
@@ -176,7 +175,7 @@ mod controllers {
             StatusCode::NO_CONTENT
         };
 
-        let mut conn = pool.get().await.unwrap(); //TODO Don't unwrap, handle errors correctly
+        let mut conn = pool.get().await.map_err(Error::from)?;
 
         devices
             .update(
@@ -198,9 +197,10 @@ mod controllers {
         pool: Pool,
         topics: Option<dto::Topics>,
     ) -> Result<impl Reply, Rejection> {
-        let address = Address::from_string(&addr).unwrap(); //TODO Don't unwrap, reply with error to the remote client
+        let address =
+            Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
 
-        let mut conn = pool.get().await.unwrap(); //TODO Don't unwrap, handle errors correctly
+        let mut conn = pool.get().await.map_err(Error::from)?;
 
         subscriptions
             .unsubscribe(&address, topics.map(|t| t.topics), &mut conn)
@@ -215,17 +215,13 @@ mod controllers {
         pool: Pool,
         topics: dto::Topics,
     ) -> Result<impl Reply, Rejection> {
-        let address = Address::from_string(&addr).unwrap(); //TODO Don't unwrap, reply with error to the remote client
+        let address =
+            Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
 
-        let mut conn = pool.get().await.unwrap(); //TODO Don't unwrap, handle errors correctly
+        let mut conn = pool.get().await.map_err(Error::from)?;
 
         subscriptions
-            .subscribe(
-                &address,
-                topics.topics,
-                SubscriptionMode::Repeat, //TODO Parse from request (with default) - for each topic or for the whole request?
-                &mut conn,
-            )
+            .subscribe(&address, topics.topics, &mut conn)
             .await?;
 
         Ok(StatusCode::NO_CONTENT)
