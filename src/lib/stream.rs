@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::model::{Amount, AssetPair};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -25,17 +27,29 @@ pub type Price = f64;
 pub type RawPrice = u64;
 
 /// Price as integer together with corresponding decimals
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct PriceWithDecimals {
     pub price: u64,
     pub decimals: u8,
 }
 
+impl fmt::Debug for PriceWithDecimals {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}*10^-{}", self.price, self.decimals)
+    }
+}
+
 /// Price range [low..high], stored as floating point numbers (decimals applied)
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct PriceLowHigh {
     low: Price,
     high: Price,
+}
+
+impl fmt::Debug for PriceLowHigh {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}..{}]", self.low, self.high)
+    }
 }
 
 pub enum Event {

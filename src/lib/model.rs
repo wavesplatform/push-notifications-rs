@@ -29,7 +29,7 @@ impl AsBase58String for Address {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Asset {
     Waves,
     IssuedAsset(AssetId),
@@ -55,13 +55,19 @@ impl Asset {
     }
 }
 
+impl fmt::Debug for Asset {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.id())
+    }
+}
+
 impl fmt::Display for Asset {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.id())
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct AssetPair {
     pub amount_asset: Asset,
     pub price_asset: Asset,
@@ -70,5 +76,11 @@ pub struct AssetPair {
 impl AssetPair {
     pub fn assets_as_ref(&self) -> (&Asset, &Asset) {
         (&self.amount_asset, &self.price_asset)
+    }
+}
+
+impl fmt::Debug for AssetPair {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.amount_asset, self.price_asset)
     }
 }
