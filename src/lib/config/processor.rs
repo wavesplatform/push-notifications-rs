@@ -1,6 +1,5 @@
 //! Push notifications Processor config
 
-use chrono::Duration;
 use serde::Deserialize;
 
 use crate::{error::Error, model::Address};

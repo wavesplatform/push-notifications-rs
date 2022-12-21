@@ -1,7 +1,6 @@
 use crate::{db::PgAsyncPool, device, subscription, Error};
 use std::sync::Arc;
 use warp::Filter;
-use wavesexchange_log::{error, info};
 use wavesexchange_warp::{
     error::{error_handler_with_serde_qs, handler, internal, validation},
     log::access,

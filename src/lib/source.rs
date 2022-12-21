@@ -1,7 +1,6 @@
 //! Blockchain updates
 
 pub mod prices {
-    use itertools::Itertools;
     use std::collections::HashMap;
 
     use tokio::sync::{mpsc, oneshot};
@@ -211,17 +210,14 @@ mod data_service {
 }
 
 mod blockchain_updates {
-    use tokio::{
-        sync::{mpsc, oneshot},
-        task,
-    };
+    use tokio::{sync::mpsc, task};
 
     use waves_protobuf_schemas::waves::events::grpc::{
         blockchain_updates_api_client::BlockchainUpdatesApiClient, SubscribeEvent, SubscribeRequest,
     };
 
     use crate::{
-        model::{Address, Asset, AssetId},
+        model::{Address, Asset},
         stream::RawPrice,
     };
 
@@ -231,6 +227,7 @@ mod blockchain_updates {
         Rollback(Rollback),
     }
 
+    #[allow(dead_code)] // fields `block_id`, `height` and `is_microblock` are never read
     #[derive(Debug)]
     pub(super) struct AppendBlock {
         pub block_id: String,
@@ -239,11 +236,13 @@ mod blockchain_updates {
         pub transactions: Vec<Transaction>,
     }
 
+    #[allow(dead_code)] // field `block_id` is never read
     #[derive(Debug)]
     pub(super) struct Rollback {
         pub block_id: String,
     }
 
+    #[allow(dead_code)] // fields `id`, `height` and `timestamp` are never read
     #[derive(Debug)]
     pub(super) struct Transaction {
         pub id: String,
@@ -253,6 +252,7 @@ mod blockchain_updates {
         pub exchange_tx: TxExchange,
     }
 
+    #[allow(dead_code)] // field `amount` is never read
     #[derive(Debug)]
     pub(super) struct TxExchange {
         pub amount_asset: Asset,
@@ -314,7 +314,6 @@ mod blockchain_updates {
     }
 
     mod convert {
-        use itertools::Itertools;
         use thiserror::Error;
 
         // The sole purpose of the following two modules is to organize imports
@@ -333,8 +332,8 @@ mod blockchain_updates {
                 },
                 signed_transaction,
                 transaction::Data,
-                Amount, AssetPair, Block, ExchangeTransactionData, MicroBlock, SignedMicroBlock,
-                SignedTransaction, Transaction,
+                Block, ExchangeTransactionData, MicroBlock, SignedMicroBlock, SignedTransaction,
+                Transaction,
             };
         }
 

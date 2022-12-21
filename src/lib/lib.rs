@@ -1,10 +1,5 @@
-#![allow(dead_code, unused_variables, unused_imports)] //TODO cleanup
-
 #[macro_use]
 extern crate async_trait;
-
-#[macro_use]
-extern crate diesel;
 
 extern crate wavesexchange_log as log;
 
@@ -23,7 +18,6 @@ pub mod source;
 pub mod subscription;
 
 mod error;
-mod fcm;
 mod stream;
 
 pub use error::Error;

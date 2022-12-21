@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::model::{Amount, AssetPair};
+use crate::model::AssetPair;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum OrderType {
@@ -66,7 +66,7 @@ pub enum Event {
 }
 
 mod impls {
-    use super::{Price, PriceLowHigh, PriceWithDecimals, RawPrice};
+    use super::{Price, PriceLowHigh, PriceWithDecimals};
 
     impl PriceWithDecimals {
         pub fn value(&self) -> Price {

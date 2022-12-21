@@ -4,8 +4,8 @@ use crate::{
     localization,
     message::{self, LocalizedMessage, Message, PreparedMessage},
     model::{Asset, Lang},
-    stream::{Event, OrderExecution, PriceWithDecimals},
-    subscription::{self, Subscription, SubscriptionMode, Topic},
+    stream::Event,
+    subscription::{self, SubscriptionMode, Topic},
 };
 use diesel_async::{AsyncConnection, AsyncPgConnection};
 use futures::FutureExt;

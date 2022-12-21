@@ -1,5 +1,4 @@
-use chrono::{DateTime, FixedOffset, Utc};
-use diesel::{dsl::exists, result::Error as DslError, ExpressionMethods, QueryDsl};
+use diesel::{result::Error as DslError, ExpressionMethods, QueryDsl};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
 use futures::FutureExt;
 

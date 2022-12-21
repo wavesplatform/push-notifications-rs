@@ -1,8 +1,9 @@
 use crate::config::postgres;
 use crate::error::Error;
-use diesel_async::pooled_connection::{bb8::Pool, AsyncDieselConnectionManager};
-use diesel_async::AsyncPgConnection;
-use diesel_async::RunQueryDsl;
+use diesel_async::{
+    pooled_connection::{bb8::Pool, AsyncDieselConnectionManager},
+    AsyncPgConnection,
+};
 
 pub type PgAsyncPool = Pool<AsyncPgConnection>;
 

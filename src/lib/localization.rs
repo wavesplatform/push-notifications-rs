@@ -107,7 +107,7 @@ impl Repo {
             .with_reqwest_builder(|rb| rb.default_headers((&auth_header).try_into().unwrap()))
             .build();
 
-        let remote_gateway = RemoteGateway { lokalise_client };
+        let remote_gateway = RemoteGateway::new(lokalise_client);
         let keys = remote_gateway.keys_for_project(&config.project_id).await?;
         let mut translations: TranslationMap = HashMap::new();
 
