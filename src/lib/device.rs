@@ -62,10 +62,15 @@ impl Repo {
             async move {
                 let device = (
                     devices::fcm_uid.eq(fcm_uid),
-                    devices::subscriber_address.eq(address),
+                    devices::subscriber_address.eq(&address),
                     devices::language.eq(lang),
                     devices::utc_offset_seconds.eq(tz_offset),
                 );
+
+                diesel::insert_into(subscribers::table)
+                    .values(subscribers::address.eq(&address))
+                    .execute(conn)
+                    .await?;
 
                 diesel::insert_into(devices::table)
                     .values(device)
@@ -88,17 +93,17 @@ impl Repo {
         conn.transaction(move |conn| {
             let address = address.as_base58_string();
             async move {
-                diesel::delete(subscribers::table.filter(subscribers::address.eq(address.clone())))
-                    .execute(conn)
-                    .await?;
-
                 diesel::delete(
                     devices::table
-                        .filter(devices::fcm_uid.eq(fcm_uid))
-                        .filter(devices::subscriber_address.eq(address)),
+                        .filter(devices::subscriber_address.eq(&address))
+                        .filter(devices::fcm_uid.eq(fcm_uid)),
                 )
                 .execute(conn)
                 .await?;
+
+                diesel::delete(subscribers::table.filter(subscribers::address.eq(&address)))
+                    .execute(conn)
+                    .await?;
 
                 Ok(())
             }
@@ -110,12 +115,11 @@ impl Repo {
     pub async fn exists(
         &self,
         address: &Address,
-        fcm_uid: FcmUid,
         conn: &mut AsyncPgConnection,
     ) -> Result<bool, Error> {
         let row_exists = devices::table
             .select(devices::fcm_uid)
-            .filter(devices::fcm_uid.eq(fcm_uid))
+            .filter(devices::subscriber_address.eq(address.as_base58_string()))
             .first::<FcmUid>(conn)
             .await;
 
@@ -154,8 +158,6 @@ impl Repo {
                         .set(devices::fcm_uid.eq(new_fcm_uid))
                         .execute(conn)
                         .await?;
-
-                    return Ok(());
                 }
 
                 if let Some(lang) = lang {
