@@ -41,9 +41,9 @@ async fn main() -> Result<(), Error> {
                 match Ok::<fcm::Message, fcm::FcmError>(fcm_msg).map(|_| ()) {
                     // match fcm::Client::new().send(fcm_msg).await.map(|_| ()) {
                     Ok(()) => {
-                        log::info!("SENT message {}", message.uid);
+                        log::info!("SENT message UID: {}", message.uid);
                         postgres::ack(&mut conn, message.uid)?;
-                        log::debug!("Message {} deleted from DB", message.uid);
+                        log::debug!("DB DELETE {:?}", message);
                     }
                     Err(err) => {
                         log::error!("Failed to send message {} | {:?}", message.uid, err);
