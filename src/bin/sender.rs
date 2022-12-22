@@ -36,6 +36,8 @@ async fn main() -> Result<(), Error> {
                 let fcm_msg = formatter::message(&config.fcm_api_key, &message);
                 // todo ttl
 
+                log::debug!("Sending {:?}", fcm_msg);
+
                 match Ok::<fcm::Message, fcm::FcmError>(fcm_msg).map(|_| ()) {
                     // match fcm::Client::new().send(fcm_msg).await.map(|_| ()) {
                     Ok(()) => {
@@ -85,6 +87,7 @@ pub struct MessageToSend {
     pub send_attempts_count: u8,
     pub notification_title: String,
     pub notification_body: String,
+    pub data: Option<serde_json::Value>,
     pub collapse_key: Option<String>,
     pub fcm_uid: String,
 }
@@ -137,6 +140,7 @@ mod postgres {
                 messages::send_attempts_count,
                 messages::notification_title,
                 messages::notification_body,
+                messages::data,
                 messages::collapse_key,
                 devices::fcm_uid,
             ))
@@ -150,7 +154,7 @@ mod postgres {
 
 mod formatter {
     use crate::MessageToSend;
-    use std::collections::HashMap;
+    use serde_json::json;
 
     pub fn message<'a>(
         fcm_api_key: &'a str,
@@ -165,7 +169,11 @@ mod formatter {
 
         let mut builder = fcm::MessageBuilder::new(fcm_api_key.as_ref(), &message_to_send.fcm_uid);
         builder.notification(notification);
-        builder.data(&HashMap::<String, String>::new()).unwrap(); // message must have `data` field, or empty object as a minimum
+
+        // message must have `data` field from DB or at least an empty object
+        builder
+            .data(message_to_send.data.as_ref().unwrap_or(&json!("{}")))
+            .unwrap(); // serde_json::Value guarantees success
 
         // todo collapse key
         // if let Some(k) = collapse_key {
