@@ -82,6 +82,13 @@ pub async fn start(
         .and(warp::body::json::<dto::Topics>())
         .and_then(controllers::subscribe_to_topics);
 
+    let topics_get = warp::get()
+        .and(warp::path!("topics"))
+        .and(user_addr)
+        .and(with_subscriptions.clone())
+        .and(with_pool.clone())
+        .and_then(controllers::get_topics);
+
     let log = warp::log::custom(access);
 
     log::info!("Starting push-notifications API server at 0.0.0.0:{}", port);
@@ -91,6 +98,7 @@ pub async fn start(
         .or(device_register)
         .or(topic_subscribe)
         .or(topic_unsubscribe)
+        .or(topics_get)
         .recover(move |rej| {
             log::error!("{:?}", rej);
             error_handler_with_serde_qs(ERROR_CODES_PREFIX, error_handler.clone())(rej)
@@ -237,10 +245,27 @@ mod controllers {
 
         Ok(StatusCode::NO_CONTENT)
     }
+
+    pub async fn get_topics(
+        addr: String,
+        subscriptions: subscription::Repo,
+        pool: Pool,
+    ) -> Result<impl Reply, Rejection> {
+        let address =
+            Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
+
+        let mut conn = pool.get().await.map_err(Error::from)?;
+
+        let topics = subscriptions
+            .get_topics_by_address(&address, &mut conn)
+            .await?;
+
+        Ok(warp::reply::json(&dto::Topics { topics }))
+    }
 }
 
 mod dto {
-    use serde::Deserialize;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Deserialize)]
     pub struct UpdateDevice {
@@ -275,7 +300,7 @@ mod dto {
         pub fcm_uid: String,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Serialize, Deserialize)]
     pub struct Topics {
         pub topics: Vec<String>,
     }

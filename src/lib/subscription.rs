@@ -352,4 +352,17 @@ impl Repo {
         })
         .await
     }
+
+    pub async fn get_topics_by_address(
+        &self,
+        addr: &Address,
+        conn: &mut AsyncPgConnection,
+    ) -> Result<Vec<String>, Error> {
+        subscriptions::table
+            .select(subscriptions::topic)
+            .filter(subscriptions::subscriber_address.eq(addr.as_base58_string()))
+            .get_results(conn)
+            .await
+            .map_err(Error::from)
+    }
 }
