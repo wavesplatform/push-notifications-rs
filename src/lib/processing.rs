@@ -2,9 +2,9 @@ use crate::{
     asset, device,
     error::Error,
     localization,
-    message::{self, LocalizedMessage, Message, PreparedMessage},
+    message::{self, LocalizedMessage, Message, MessageData, PreparedMessage},
     model::{Asset, Lang},
-    stream::Event,
+    stream::{Event, OrderExecution},
     subscription::{self, SubscriptionMode, Topic},
 };
 use diesel_async::{AsyncConnection, AsyncPgConnection};
@@ -68,6 +68,7 @@ impl MessagePump {
         for subscription in subscriptions {
             let is_oneshot = subscription.mode == SubscriptionMode::Once;
             let msg = self.make_message(&event, &subscription.topic).await?;
+            let meta = self.make_metadata(&event);
             let address = &subscription.subscriber;
             let devices = self.devices.subscribers(address, conn).await?;
             for device in devices {
@@ -75,7 +76,7 @@ impl MessagePump {
                 let prepared_message = PreparedMessage {
                     device,
                     message,
-                    data: None,
+                    data: Some(meta.clone()),
                     collapse_key: None,
                 };
                 self.messages.enqueue(prepared_message, conn).await?;
@@ -138,6 +139,31 @@ impl MessagePump {
             (_, _) => unreachable!("unrecognized combination of subscription and event"),
         };
         Ok(res)
+    }
+
+    fn make_metadata(&self, event: &Event) -> MessageData {
+        let ev_type = match event {
+            Event::OrderExecuted {
+                execution: OrderExecution::Partial { .. },
+                ..
+            } => MessageData::TYPE_ORDER_PART,
+            Event::OrderExecuted {
+                execution: OrderExecution::Full,
+                ..
+            } => MessageData::TYPE_ORDER_FULL,
+            Event::PriceChanged { .. } => MessageData::TYPE_PRICE,
+        };
+
+        let assets = match event {
+            Event::OrderExecuted { asset_pair, .. } => asset_pair,
+            Event::PriceChanged { asset_pair, .. } => asset_pair,
+        };
+
+        MessageData {
+            event_type: ev_type,
+            amount_asset_id: assets.amount_asset.id(),
+            price_asset_id: assets.price_asset.id(),
+        }
     }
 
     async fn asset_ticker(&self, asset: &Asset) -> Result<String, Error> {
