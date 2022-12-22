@@ -142,27 +142,29 @@ impl MessagePump {
     }
 
     fn make_metadata(&self, event: &Event) -> MessageData {
-        let ev_type = match event {
-            Event::OrderExecuted {
-                execution: OrderExecution::Partial { .. },
-                ..
-            } => MessageData::TYPE_ORDER_PART,
+        match event {
             Event::OrderExecuted {
                 execution: OrderExecution::Full,
+                asset_pair,
                 ..
-            } => MessageData::TYPE_ORDER_FULL,
-            Event::PriceChanged { .. } => MessageData::TYPE_PRICE,
-        };
+            } => MessageData::OrderExecuted {
+                amount_asset_id: asset_pair.amount_asset.id(),
+                price_asset_id: asset_pair.price_asset.id(),
+            },
 
-        let assets = match event {
-            Event::OrderExecuted { asset_pair, .. } => asset_pair,
-            Event::PriceChanged { asset_pair, .. } => asset_pair,
-        };
+            Event::OrderExecuted {
+                execution: OrderExecution::Partial { .. },
+                asset_pair,
+                ..
+            } => MessageData::OrderPartiallyExecuted {
+                amount_asset_id: asset_pair.amount_asset.id(),
+                price_asset_id: asset_pair.price_asset.id(),
+            },
 
-        MessageData {
-            event_type: ev_type,
-            amount_asset_id: assets.amount_asset.id(),
-            price_asset_id: assets.price_asset.id(),
+            Event::PriceChanged { asset_pair, .. } => MessageData::PriceThresholdReached {
+                amount_asset_id: asset_pair.amount_asset.id(),
+                price_asset_id: asset_pair.price_asset.id(),
+            },
         }
     }
 

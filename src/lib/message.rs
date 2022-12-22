@@ -37,38 +37,77 @@ pub struct PreparedMessage {
 }
 
 #[derive(Clone, Serialize)]
-pub struct MessageData {
-    #[serde(rename = "t")]
-    pub event_type: u8,
-    #[serde(rename = "a")]
-    pub amount_asset_id: String,
-    #[serde(rename = "p")]
-    pub price_asset_id: String,
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum MessageData {
+    OrderPartiallyExecuted {
+        amount_asset_id: String,
+        price_asset_id: String,
+    },
+    OrderExecuted {
+        amount_asset_id: String,
+        price_asset_id: String,
+    },
+    PriceThresholdReached {
+        amount_asset_id: String,
+        price_asset_id: String,
+    },
 }
 
-impl MessageData {
-    pub const TYPE_ORDER_PART: u8 = 0;
-    pub const TYPE_ORDER_FULL: u8 = 1;
-    pub const TYPE_PRICE: u8 = 2;
-}
-
-#[test]
-fn test_message_data_serialize() {
+#[cfg(test)]
+mod message_data_serialize_tests {
+    use super::MessageData;
     use serde_json::{json, to_value};
-    let data = MessageData {
-        event_type: 42,
-        amount_asset_id: "asset1".to_string(),
-        price_asset_id: "asset2".to_string(),
-    };
-    let expected_json = json! (
-        {
-            "t": 42,
-            "a": "asset1",
-            "p": "asset2",
-        }
-    );
-    let value = to_value(data).expect("serialize");
-    assert_eq!(value, expected_json);
+
+    #[test]
+    fn test_order_part() {
+        let data = MessageData::OrderPartiallyExecuted {
+            amount_asset_id: "asset1".to_string(),
+            price_asset_id: "asset2".to_string(),
+        };
+        let expected_json = json! (
+            {
+                "type": "order_partially_executed",
+                "amount_asset_id": "asset1",
+                "price_asset_id": "asset2",
+            }
+        );
+        let value = to_value(data).expect("serialize");
+        assert_eq!(value, expected_json);
+    }
+
+    #[test]
+    fn test_order_full() {
+        let data = MessageData::OrderExecuted {
+            amount_asset_id: "asset1".to_string(),
+            price_asset_id: "asset2".to_string(),
+        };
+        let expected_json = json! (
+            {
+                "type": "order_executed",
+                "amount_asset_id": "asset1",
+                "price_asset_id": "asset2",
+            }
+        );
+        let value = to_value(data).expect("serialize");
+        assert_eq!(value, expected_json);
+    }
+
+    #[test]
+    fn test_price() {
+        let data = MessageData::PriceThresholdReached {
+            amount_asset_id: "asset1".to_string(),
+            price_asset_id: "asset2".to_string(),
+        };
+        let expected_json = json! (
+            {
+                "type": "price_threshold_reached",
+                "amount_asset_id": "asset1",
+                "price_asset_id": "asset2",
+            }
+        );
+        let value = to_value(data).expect("serialize");
+        assert_eq!(value, expected_json);
+    }
 }
 
 pub struct Queue {}
