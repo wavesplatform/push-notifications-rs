@@ -33,7 +33,7 @@ async fn main() -> Result<(), Error> {
                 // .unwrap() is safe, non-negativity is validated on config load (u32)
             }
             Some(message) => {
-                let fcm_msg = formatter::message(&config.fcm_api_key, &message);
+                let fcm_msg = message.to_fcm(&config.fcm_api_key);
                 // todo ttl
 
                 log::debug!("Sending {:?}", fcm_msg);
@@ -90,6 +90,35 @@ pub struct MessageToSend {
     pub data: Option<serde_json::Value>,
     pub collapse_key: Option<String>,
     pub fcm_uid: String,
+}
+
+impl MessageToSend {
+    pub fn to_fcm<'a>(&'a self, fcm_api_key: &'a str) -> fcm::Message<'a> {
+        let notification = {
+            let mut builder = fcm::NotificationBuilder::new();
+            builder.title(&self.notification_title);
+            builder.body(&self.notification_body);
+            builder.finalize()
+        };
+
+        let mut builder = fcm::MessageBuilder::new(fcm_api_key.as_ref(), &self.fcm_uid);
+        builder.notification(notification);
+
+        // message must have `data` field from DB or at least an empty object
+        builder
+            .data(self.data.as_ref().unwrap_or(&serde_json::json!("{}")))
+            .unwrap(); // serde_json::Value guarantees success
+
+        // todo collapse key
+        // if let Some(k) = collapse_key {
+        // builder.collapse_key(&k);
+        // }
+
+        // todo ttl
+        // todo priority
+
+        builder.finalize()
+    }
 }
 
 // todo db transactions
@@ -152,41 +181,7 @@ mod postgres {
     }
 }
 
-mod formatter {
-    use crate::MessageToSend;
-    use serde_json::json;
-
-    pub fn message<'a>(
-        fcm_api_key: &'a str,
-        message_to_send: &'a MessageToSend,
-    ) -> fcm::Message<'a> {
-        let notification = {
-            let mut builder = fcm::NotificationBuilder::new();
-            builder.title(&message_to_send.notification_title);
-            builder.body(&message_to_send.notification_body);
-            builder.finalize()
-        };
-
-        let mut builder = fcm::MessageBuilder::new(fcm_api_key.as_ref(), &message_to_send.fcm_uid);
-        builder.notification(notification);
-
-        // message must have `data` field from DB or at least an empty object
-        builder
-            .data(message_to_send.data.as_ref().unwrap_or(&json!("{}")))
-            .unwrap(); // serde_json::Value guarantees success
-
-        // todo collapse key
-        // if let Some(k) = collapse_key {
-        // builder.collapse_key(&k);
-        // }
-
-        // todo ttl
-        // todo priority
-
-        builder.finalize()
-    }
-}
-
+// todo remove or move to integration tests
 // #[tokio::test]
 // async fn get_msg() {
 //     let config = Config::load().unwrap();
