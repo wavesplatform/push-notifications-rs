@@ -3,7 +3,6 @@ use std::fmt::Display;
 use chrono::{DateTime, Utc};
 use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
-use futures::FutureExt;
 use reqwest::Url;
 
 use crate::{
@@ -12,6 +11,8 @@ use crate::{
     schema::{subscriptions, topics_price_threshold},
     stream::{Event, Price},
 };
+
+use crate::scoped_futures::ScopedFutureExt;
 
 pub struct Subscription {
     pub uid: i32,
@@ -301,7 +302,7 @@ impl Repo {
                 }
                 Ok(())
             }
-            .boxed()
+            .scope_boxed()
         })
         .await
     }
@@ -348,7 +349,7 @@ impl Repo {
 
                 Ok(())
             }
-            .boxed()
+            .scope_boxed()
         })
         .await
     }

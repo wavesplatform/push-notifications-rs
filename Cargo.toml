@@ -3,12 +3,9 @@ name = "push-notifications-rs"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 async-trait = "0.1.59"
-futures = "0.3"
-tokio = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread"] }
 serde = { version = "1.0", features = ["derive"] }
 waves-rust = "0.2.0"
 warp = "0.3"
@@ -17,21 +14,18 @@ serde_json = "1.0"
 envy = "0.4"
 thiserror = "1.0"
 reqwest = { version = "0.11", features = ["json"] }
-wavesexchange_apis = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_apis/0.1.16" }
+wavesexchange_apis = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_apis/0.1.17" }
 wavesexchange_loaders = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_loaders/0.2.1" }
 wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
-wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.3" }
+wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.4" }
 diesel = { version = "2.0", default-features = false, features = ["postgres", "chrono", "serde_json", "without-deprecated"] }
 diesel_migrations = "2.0"
-diesel-async = { version = "0.1", features = ["postgres", "bb8"] }
+diesel-async = { version = "0.2", features = ["postgres", "bb8"] }
 anyhow = "1.0"
 itertools = "0.10"
 fcm = "0.9"
-prost = { version = "0.8", features = ["no-recursion-limit"] }
-tonic = "0.5"
-waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", tag = "v1.4.3" }
+waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", tag = "rust_v1.4.3-1" }
 bs58 = "0.4"
-bigdecimal = "0.1"
 bb8 = "0.8.0"
 
 #TODO This crate is not needed directly, but it is here, with a specific version, to fix the build of `waves-rust` crate.

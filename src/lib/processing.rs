@@ -8,9 +8,10 @@ use crate::{
     subscription::{self, SubscriptionMode, Topic},
 };
 use diesel_async::{AsyncConnection, AsyncPgConnection};
-use futures::FutureExt;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
+
+use crate::scoped_futures::ScopedFutureExt;
 
 pub struct EventWithFeedback {
     pub event: Event,
@@ -56,7 +57,7 @@ impl MessagePump {
                         // Asynchronously process this event within a database transaction
                         this.process_event(event, conn).await
                     }
-                    .boxed()
+                    .scope_boxed()
                 })
                 .await;
             result_tx.send(res).expect("ack");
