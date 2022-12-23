@@ -1,12 +1,13 @@
 use diesel::{result::Error as DslError, ExpressionMethods, QueryDsl};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
-use futures::FutureExt;
 
 use crate::{
     model::{Address, AsBase58String, Lang},
     schema::{devices, subscribers},
     Error,
 };
+
+use crate::scoped_futures::ScopedFutureExt;
 
 pub type FcmUid = String;
 
@@ -78,7 +79,7 @@ impl Repo {
 
                 Ok(())
             }
-            .boxed()
+            .scope_boxed()
         })
         .await
     }
@@ -106,7 +107,7 @@ impl Repo {
 
                 Ok(())
             }
-            .boxed()
+            .scope_boxed()
         })
         .await
     }
@@ -177,7 +178,7 @@ impl Repo {
 
                 Ok(())
             }
-            .boxed()
+            .scope_boxed()
         })
         .await
     }

@@ -22,3 +22,5 @@ mod stream;
 
 pub use error::Error;
 pub use message::Message;
+
+pub use diesel_async::scoped_futures;
