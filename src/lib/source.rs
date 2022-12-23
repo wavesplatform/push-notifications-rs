@@ -150,8 +150,8 @@ mod data_service {
         stream::PriceWithDecimals,
     };
     use anyhow::ensure;
-    use bigdecimal::ToPrimitive;
     use wavesexchange_apis::{
+        bigdecimal::ToPrimitive,
         data_service::{dto, DataService},
         HttpClient,
     };
@@ -212,8 +212,12 @@ mod data_service {
 mod blockchain_updates {
     use tokio::{sync::mpsc, task};
 
-    use waves_protobuf_schemas::waves::events::grpc::{
-        blockchain_updates_api_client::BlockchainUpdatesApiClient, SubscribeEvent, SubscribeRequest,
+    use waves_protobuf_schemas::{
+        tonic,
+        waves::events::grpc::{
+            blockchain_updates_api_client::BlockchainUpdatesApiClient, SubscribeEvent,
+            SubscribeRequest,
+        },
     };
 
     use crate::{
