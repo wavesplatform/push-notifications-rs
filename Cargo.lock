@@ -1726,7 +1726,6 @@ dependencies = [
  "bb8",
  "bs58",
  "chrono",
- "curve25519-dalek 4.0.0-pre.2",
  "diesel",
  "diesel-async",
  "diesel_migrations",
@@ -2954,9 +2953,9 @@ dependencies = [
 
 [[package]]
 name = "waves-rust"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "709f7e8bea91479bc742033db9cbdf1f289b9a777491285a13aef3ca91e97cbe"
+checksum = "9668500ef548973935670afd0a8a793d57981855c51ccc962f8acbf3b859f166"
 dependencies = [
  "base64 0.13.1",
  "blake2",
