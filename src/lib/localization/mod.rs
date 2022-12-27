@@ -4,9 +4,11 @@ use crate::{
     model::Lang,
     stream::OrderExecution,
 };
-use std::collections::HashMap;
 
-use self::localise_gateway::{dto::KeysResponse, RemoteGateway, LOCALISE_API_URL};
+use self::{
+    localise_gateway::{RemoteGateway, LOCALISE_API_URL},
+    translations::TranslationMap,
+};
 
 pub use self::localise_gateway::LokaliseConfig;
 
@@ -20,10 +22,89 @@ mod lokalise_keys {
     pub const PRICE_ALERT_MSG: &str = "priceAlertMessage";
 }
 
-type Key = String;
-type Value = String;
-type ValuesMap = HashMap<Lang, Value>;
-type TranslationMap = HashMap<Key, ValuesMap>;
+mod translations {
+    use super::localise_gateway::dto::KeysResponse;
+    use crate::model::Lang;
+    use std::{
+        collections::{BTreeSet, HashMap},
+        fmt,
+    };
+
+    pub(super) type Key = String;
+    pub(super) type Value = String;
+    pub(super) type ValuesMap = HashMap<Lang, Value>;
+    pub(super) struct TranslationMap(HashMap<Key, ValuesMap>);
+
+    impl TranslationMap {
+        pub(super) fn build(keys: KeysResponse) -> Self {
+            let mut translations = HashMap::<Key, ValuesMap>::new();
+            for key in keys.keys {
+                let key_name = key.key_name.web;
+
+                if let Some(t) = key.translations {
+                    for tr in t {
+                        translations
+                            .entry(key_name.clone())
+                            .or_default()
+                            .insert(tr.language_iso, tr.translation);
+                    }
+                }
+            }
+            TranslationMap(translations)
+        }
+
+        pub(super) fn is_complete(&self) -> bool {
+            let TranslationMap(translations) = self;
+            let keys = self.keys();
+            let langs = self.langs();
+            for lang in &langs {
+                for key in &keys {
+                    let has_value = translations
+                        .get(key)
+                        .map(|values| values.get(lang))
+                        .flatten()
+                        .is_some();
+                    if !has_value {
+                        return false;
+                    }
+                }
+            }
+            true
+        }
+
+        fn keys(&self) -> BTreeSet<Key> {
+            let TranslationMap(translations) = self;
+            translations.keys().map(String::to_owned).collect()
+        }
+
+        fn langs(&self) -> BTreeSet<Lang> {
+            let TranslationMap(translations) = self;
+            translations
+                .values()
+                .map(|values| values.keys())
+                .flatten()
+                .map(String::to_owned)
+                .collect()
+        }
+
+        pub(super) fn translate(&self, key: &str, lang: &str) -> Option<Value> {
+            let TranslationMap(translations) = self;
+            translations[key].get(lang).cloned()
+        }
+    }
+
+    impl fmt::Debug for TranslationMap {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(
+                f,
+                "Languages: {:?}, Keys: {:?}, Translations: {:?}",
+                self.langs(),
+                self.keys(),
+                self.0,
+            )
+        }
+    }
+}
 
 pub struct Repo {
     translations: TranslationMap,
@@ -33,30 +114,17 @@ impl Repo {
     pub async fn new(config: LokaliseConfig) -> Result<Self, Error> {
         let remote_gateway = RemoteGateway::new(LOCALISE_API_URL, &config.token);
         let keys = remote_gateway.keys_for_project(&config.project_id).await?;
-        let translations = Self::keys_to_translations(keys);
-        log::trace!("Lokalise translations: {:?}", translations);
+        let translations = TranslationMap::build(keys);
+        if translations.is_complete() {
+            log::trace!("Lokalise translations: {:?}", translations);
+        } else {
+            log::warn!("Incomplete lokalise translations: {:?}", translations);
+        }
         Ok(Self { translations })
     }
 
-    fn keys_to_translations(keys: KeysResponse) -> TranslationMap {
-        let mut translations = HashMap::<Key, ValuesMap>::new();
-        for key in keys.keys {
-            let key_name = key.key_name.web;
-
-            if let Some(t) = key.translations {
-                for tr in t {
-                    translations
-                        .entry(key_name.clone())
-                        .or_default()
-                        .insert(tr.language_iso, tr.translation);
-                }
-            }
-        }
-        translations
-    }
-
     pub fn localize(&self, message: &Message, lang: &Lang) -> Option<LocalizedMessage> {
-        let translate = |key| self.translations[key].get(lang).cloned();
+        let translate = |key| self.translations.translate(key, lang);
 
         let title = match message {
             Message::OrderExecuted { .. } => lokalise_keys::ORDER_FILLED_TITLE,
