@@ -9,6 +9,7 @@ use crate::{error::Error, model::Address};
 
 #[derive(Clone)]
 pub struct Config {
+    pub metrics_port: u16,
     pub assets_service_url: String,
     pub lokalise_token: String,
     pub lokalise_project_id: String,
@@ -56,6 +57,7 @@ impl Config {
     pub fn load() -> Result<Self, Error> {
         let config = envy::from_env::<RawConfig>()?;
         let config = Config {
+            metrics_port: config.metrics_port,
             assets_service_url: config.assets_service_url,
             lokalise_token: config.lokalise_token,
             lokalise_project_id: config.lokalise_project_id,
@@ -83,6 +85,8 @@ impl Config {
 
 #[derive(Deserialize)]
 struct RawConfig {
+    #[serde(default = "default_metrics_port")]
+    metrics_port: u16,
     assets_service_url: String,
     data_service_url: String,
     blockchain_updates_url: String,
@@ -101,6 +105,10 @@ struct RawConfig {
     redis_consumer_name: String,
     #[serde(default = "default_redis_batch_size")]
     redis_batch_size: u32,
+}
+
+fn default_metrics_port() -> u16 {
+    9090
 }
 
 fn default_redis_port() -> u16 {

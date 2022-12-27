@@ -10,6 +10,8 @@ use std::sync::Arc;
 use diesel_async::{AsyncConnection, AsyncPgConnection};
 use tokio::{sync::mpsc, task};
 
+use wavesexchange_warp::MetricsWarpBuilder;
+
 use lib::{
     asset,
     config::{postgres, processor},
@@ -33,6 +35,17 @@ async fn main() -> Result<(), anyhow::Error> {
         token: config.lokalise_token,
         project_id: config.lokalise_project_id,
     };
+
+    // Initialization
+    //let (init_finished_tx, init_finished_rx) = oneshot::channel(); //TODO readyz
+
+    // Stats & liveness endpoints
+    task::spawn(async move {
+        MetricsWarpBuilder::new()
+            .with_metrics_port(config.metrics_port)
+            //.with_readyz_checker(|| async move { init_finished_rx.await }) //TODO readyz
+            .run_async()
+    });
 
     // Database
     log::info!("Connecting to postgres database: {:?}", pg_config);
@@ -97,6 +110,9 @@ async fn main() -> Result<(), anyhow::Error> {
     let processor = MessagePump::new(subscriptions, assets, devices, localizer, messages);
     let processor = Arc::new(processor);
     let h_processor = task::spawn(async { processor.run_event_loop(events_rx, conn).await });
+
+    // Initialization phase finished
+    //let () = init_finished_tx.send(()).expect("init"); //TODO readyz
 
     // Join all the background tasks
     let ((), r_prices_source, r_orders_source) =
