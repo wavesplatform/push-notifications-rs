@@ -1,9 +1,10 @@
-use crate::stream::OrderSide;
+use std::collections::HashMap;
+
 use crate::{
     error::Error,
     message::{LocalizedMessage, Message},
     model::Lang,
-    stream::OrderExecution,
+    stream::{OrderExecution, OrderSide},
 };
 
 use self::{
@@ -90,9 +91,9 @@ mod translations {
                 .collect()
         }
 
-        pub(super) fn translate(&self, key: &str, lang: &str) -> Option<Value> {
+        pub(super) fn translate(&self, key: &str, lang: &str) -> Option<&Value> {
             let TranslationMap(translations) = self;
-            translations[key].get(lang).cloned()
+            translations[key].get(lang)
         }
     }
 
@@ -150,14 +151,84 @@ impl Repo {
             Message::PriceThresholdReached { .. } => None,
         };
 
-        let _side = match side_key {
-            Some(key) => Some(translate(key)?),
-            None => None,
+        let side = match side_key {
+            Some(key) => translate(key)?,
+            None => "",
         };
 
+        let (amount_token, price_token) = match message {
+            Message::OrderExecuted {
+                amount_asset_ticker,
+                price_asset_ticker,
+                ..
+            }
+            | Message::PriceThresholdReached {
+                amount_asset_ticker,
+                price_asset_ticker,
+                ..
+            } => (amount_asset_ticker, price_asset_ticker),
+        };
+
+        let pair = format!("{} / {}", amount_token, price_token);
+
+        let value = match message {
+            Message::OrderExecuted { .. } => "".to_string(),
+            Message::PriceThresholdReached { threshold, .. } => format!("{}", threshold),
+        };
+
+        let date = "?"; //TODO Need date field in the message
+        let time = "?"; //TODO Need time field in the message
+
+        let title = translate(title_key)?;
+        let body = translate(body_key)?;
+
+        let subst = HashMap::from([
+            ("", ""),
+            ("amountToken", amount_token),
+            ("priceToken", price_token),
+            ("pair", &pair),
+            ("side", side),
+            ("value", &value),
+            ("date", date),
+            ("time", time),
+        ]);
+
         Some(LocalizedMessage {
-            notification_title: translate(title_key)?,
-            notification_body: translate(body_key)?,
+            notification_title: template::interpolate(title, &subst),
+            notification_body: template::interpolate(body, &subst),
         })
+    }
+}
+
+mod template {
+    use regex::{Captures, Regex};
+    use std::borrow::Cow;
+    use std::collections::HashMap;
+
+    pub(super) fn interpolate(s: &str, subst: &HashMap<&str, &str>) -> String {
+        let re = Regex::new(r#"\[%s:([a-zA-z]+)]"#).expect("regex");
+        re.replace_all(s, |caps: &Captures| {
+            let key = caps.get(1).expect("regex capture").as_str();
+            subst
+                .get(key)
+                .map(|s| Cow::Borrowed(*s))
+                .unwrap_or_else(|| Cow::Owned(format!("<{}>", key)))
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn test_interpolate() {
+        let subst = HashMap::from([("foo", "bar"), ("fee", "baz")]);
+        assert_eq!(&interpolate("", &subst), "");
+        assert_eq!(&interpolate("[%s:foo]", &subst), "bar");
+        assert_eq!(&interpolate("[%s:foo] bar", &subst), "bar bar");
+        assert_eq!(&interpolate("[%s:foo] [%s:fee]", &subst), "bar baz");
+        assert_eq!(&interpolate("[%s:foo] [%s:foo]", &subst), "bar bar");
+        assert_eq!(
+            &interpolate("[%s:foo] [%s:fee] [%s:foo]", &subst),
+            "bar baz bar"
+        );
+        assert_eq!(&interpolate("[%s:unknown]", &subst), "<unknown>");
     }
 }

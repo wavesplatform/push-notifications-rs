@@ -1732,6 +1732,7 @@ dependencies = [
  "envy",
  "fcm",
  "itertools",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
