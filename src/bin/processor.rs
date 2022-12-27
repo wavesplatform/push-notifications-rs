@@ -1,11 +1,14 @@
 //! Push notifications Processor service executable
 
+#[macro_use]
+extern crate tokio;
+
 extern crate wavesexchange_log as log;
 
 use std::sync::Arc;
 
 use diesel_async::{AsyncConnection, AsyncPgConnection};
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, task};
 
 use lib::{
     asset,
@@ -55,19 +58,25 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Start event sources
     log::info!("Starting event sources");
-    prices_source
-        .start(
-            config.blockchain_updates_url,
-            config.starting_height,
-            events_tx.clone(),
-        )
-        .await?;
+    let h_prices_source = task::spawn(async move {
+        prices_source
+            .run(
+                config.blockchain_updates_url,
+                config.starting_height,
+                events_tx.clone(),
+            )
+            .await
+    });
 
     // Event processor
     log::info!("Initialization finished, starting service");
     let processor = MessagePump::new(subscriptions, assets, devices, localizer, messages);
     let processor = Arc::new(processor);
-    processor.run_event_loop(events_rx, conn).await;
+    let h_processor = task::spawn(async { processor.run_event_loop(events_rx, conn).await });
+
+    // Join all the background tasks
+    let ((), r_prices_source) = try_join!(h_processor, h_prices_source)?;
+    let () = r_prices_source?;
 
     Ok(())
 }

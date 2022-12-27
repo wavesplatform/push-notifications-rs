@@ -43,7 +43,7 @@ pub mod prices {
             Ok(())
         }
 
-        pub async fn start(
+        pub async fn run(
             &mut self,
             blockchain_updates_url: String,
             starting_height: u32,
