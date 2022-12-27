@@ -24,11 +24,13 @@ pub enum Message {
     },
 }
 
+#[derive(Debug)]
 pub struct LocalizedMessage {
     pub notification_title: String,
     pub notification_body: String,
 }
 
+#[derive(Debug)]
 pub struct PreparedMessage {
     pub device: Device, // device_uid and address
     pub message: LocalizedMessage,
@@ -36,7 +38,7 @@ pub struct PreparedMessage {
     pub collapse_key: Option<String>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum MessageData {
     OrderPartiallyExecuted {

@@ -100,6 +100,12 @@ pub mod prices {
                         decimals: 8, // This is a hard-coded value
                     };
                     if let Some(prev_price) = self.last_prices.get(&asset_pair) {
+                        log::trace!(
+                            "Price change: {:?} : {:?} -> {:?}",
+                            asset_pair,
+                            prev_price,
+                            new_price
+                        );
                         block_prices
                             .entry(asset_pair.clone())
                             .and_modify(|price| *price = price.clone().merge(new_price))

@@ -14,6 +14,7 @@ use crate::{
 
 use crate::scoped_futures::ScopedFutureExt;
 
+#[derive(Debug)]
 pub struct Subscription {
     pub uid: i32,
     pub subscriber: Address,
@@ -34,6 +35,7 @@ pub enum SubscriptionMode {
     Repeat,
 }
 
+#[derive(Debug)]
 pub enum Topic {
     OrderFulfilled {
         amount_asset: Asset,

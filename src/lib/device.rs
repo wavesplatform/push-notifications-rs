@@ -11,6 +11,7 @@ use crate::scoped_futures::ScopedFutureExt;
 
 pub type FcmUid = String;
 
+#[derive(Debug)]
 pub struct Device {
     pub device_uid: i32,
     pub address: Address,

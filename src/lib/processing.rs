@@ -48,6 +48,7 @@ impl MessagePump {
         mut events: mpsc::Receiver<EventWithFeedback>,
         mut conn: AsyncPgConnection,
     ) {
+        log::debug!("Starting event processing loop");
         while let Some(event) = events.recv().await {
             let EventWithFeedback { event, result_tx } = event;
             let this = self.clone();
@@ -66,13 +67,21 @@ impl MessagePump {
 
     async fn process_event(&self, event: Event, conn: &mut AsyncPgConnection) -> Result<(), Error> {
         let subscriptions = self.subscriptions.matching(&event, conn).await?;
+        if subscriptions.is_empty() {
+            log::trace!("Event with no matching subscriptions: {:?}", event);
+        } else {
+            let n = subscriptions.len();
+            log::debug!("Event with {} matching subscriptions: {:?}", n, event);
+        }
         for subscription in subscriptions {
+            log::debug!("  Subscription: {:?}", subscription);
             let is_oneshot = subscription.mode == SubscriptionMode::Once;
             let msg = self.make_message(&event, &subscription.topic).await?;
             let meta = self.make_metadata(&event);
             let address = &subscription.subscriber;
             let devices = self.devices.subscribers(address, conn).await?;
             for device in devices {
+                log::debug!("    Device: {:?}", device);
                 let message = self.localize(&msg, &device.lang);
                 let prepared_message = PreparedMessage {
                     device,
@@ -80,9 +89,14 @@ impl MessagePump {
                     data: Some(meta.clone()),
                     collapse_key: None,
                 };
+                log::debug!("      Message prepared: {:?}", prepared_message);
                 self.messages.enqueue(prepared_message, conn).await?;
             }
             if is_oneshot {
+                log::debug!(
+                    "Removing completed one-shot subscription: {:?}",
+                    subscription
+                );
                 self.subscriptions
                     .complete_oneshot(subscription, conn)
                     .await?;
