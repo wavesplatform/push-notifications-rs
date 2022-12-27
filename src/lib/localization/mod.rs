@@ -1,3 +1,4 @@
+use crate::stream::OrderSide;
 use crate::{
     error::Error,
     message::{LocalizedMessage, Message},
@@ -20,6 +21,8 @@ mod lokalise_keys {
     pub const ORDER_PART_FILLED_MSG: &str = "orderPartFilledMessage";
     pub const PRICE_ALERT_TITLE: &str = "priceAlertTitle";
     pub const PRICE_ALERT_MSG: &str = "priceAlertMessage";
+    pub const BUY: &str = "buy";
+    pub const SELL: &str = "sell";
 }
 
 mod translations {
@@ -126,12 +129,12 @@ impl Repo {
     pub fn localize(&self, message: &Message, lang: &Lang) -> Option<LocalizedMessage> {
         let translate = |key| self.translations.translate(key, lang);
 
-        let title = match message {
+        let title_key = match message {
             Message::OrderExecuted { .. } => lokalise_keys::ORDER_FILLED_TITLE,
             Message::PriceThresholdReached { .. } => lokalise_keys::PRICE_ALERT_TITLE,
         };
 
-        let body = match message {
+        let body_key = match message {
             Message::OrderExecuted { execution, .. } => match execution {
                 OrderExecution::Full => lokalise_keys::ORDER_FILLED_MSG,
                 OrderExecution::Partial { .. } => lokalise_keys::ORDER_PART_FILLED_MSG,
@@ -139,9 +142,22 @@ impl Repo {
             Message::PriceThresholdReached { .. } => lokalise_keys::PRICE_ALERT_MSG,
         };
 
+        let side_key = match message {
+            Message::OrderExecuted { side, .. } => Some(match side {
+                OrderSide::Buy => lokalise_keys::BUY,
+                OrderSide::Sell => lokalise_keys::SELL,
+            }),
+            Message::PriceThresholdReached { .. } => None,
+        };
+
+        let _side = match side_key {
+            Some(key) => Some(translate(key)?),
+            None => None,
+        };
+
         Some(LocalizedMessage {
-            notification_title: translate(title)?,
-            notification_body: translate(body)?,
+            notification_title: translate(title_key)?,
+            notification_body: translate(body_key)?,
         })
     }
 }
