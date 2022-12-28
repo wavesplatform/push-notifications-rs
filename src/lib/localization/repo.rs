@@ -82,7 +82,7 @@ impl Repo {
             } => (amount_asset_ticker, price_asset_ticker),
         };
 
-        let pair = format!("{} / {}", amount_token, price_token);
+        let pair = format!("{}/{}", amount_token, price_token);
 
         let value = match message {
             Message::OrderExecuted { .. } => "".to_string(),
