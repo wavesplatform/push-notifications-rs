@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::config::postgres;
 use crate::error::Error;
 use diesel_async::{
@@ -12,6 +14,7 @@ pub async fn async_pool(config: &postgres::Config) -> Result<PgAsyncPool, Error>
     let config = AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new(db_url);
 
     let pool = Pool::builder()
+        .connection_timeout(Duration::from_secs(5))
         .build(config)
         .await
         .map_err(|e| Error::Generic(e.to_string()))?;

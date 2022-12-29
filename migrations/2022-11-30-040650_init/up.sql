@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     topic varchar NOT NULL,
     topic_type integer not null, -- todo enum instead of integer
     primary key (subscriber_address, topic),
-    foreign key (subscriber_address) references subscribers(address)
+    foreign key (subscriber_address) references subscribers(address) ON DELETE CASCADE
 );
 
 -- Topic-specific tables. Fields are indexed and search-optimized.
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS topics_price_threshold (
     amount_asset_id varchar not null,
     price_asset_id varchar not null,
     price_threshold double precision not null,
-    foreign key (subscription_uid) references subscriptions(uid)
+    foreign key (subscription_uid) references subscriptions(uid) ON DELETE CASCADE
 );
 create index on topics_price_threshold(amount_asset_id, price_asset_id, price_threshold);
 

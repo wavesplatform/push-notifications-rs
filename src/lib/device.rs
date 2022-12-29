@@ -1,4 +1,4 @@
-use diesel::{result::Error as DslError, ExpressionMethods, QueryDsl};
+use diesel::{result::Error as DslError, AsChangeset, ExpressionMethods, QueryDsl};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
 
 use crate::{
@@ -51,7 +51,7 @@ impl Repo {
     pub async fn register(
         &self,
         address: &Address,
-        fcm_uid: FcmUid,
+        fcm_uid: &FcmUid,
         lang: &str,
         tz_offset: i32,
         conn: &mut AsyncPgConnection,
@@ -70,6 +70,7 @@ impl Repo {
 
                 diesel::insert_into(subscribers::table)
                     .values(subscribers::address.eq(&address))
+                    .on_conflict_do_nothing()
                     .execute(conn)
                     .await?;
 
@@ -88,7 +89,7 @@ impl Repo {
     pub async fn unregister(
         &self,
         address: &Address,
-        fcm_uid: FcmUid,
+        fcm_uid: &FcmUid,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         conn.transaction(move |conn| {
@@ -102,9 +103,17 @@ impl Repo {
                 .execute(conn)
                 .await?;
 
-                diesel::delete(subscribers::table.filter(subscribers::address.eq(&address)))
-                    .execute(conn)
-                    .await?;
+                let extra_devices_with_same_addr = devices::table
+                    .select(devices::fcm_uid)
+                    .filter(devices::subscriber_address.eq(&address))
+                    .first::<FcmUid>(conn)
+                    .await;
+
+                if optional(extra_devices_with_same_addr)?.is_none() {
+                    diesel::delete(subscribers::table.filter(subscribers::address.eq(&address)))
+                        .execute(conn)
+                        .await?;
+                }
 
                 Ok(())
             }
@@ -116,71 +125,66 @@ impl Repo {
     pub async fn exists(
         &self,
         address: &Address,
+        fcm_uid: &FcmUid,
         conn: &mut AsyncPgConnection,
     ) -> Result<bool, Error> {
         let row_exists = devices::table
             .select(devices::fcm_uid)
             .filter(devices::subscriber_address.eq(address.as_base58_string()))
+            .filter(devices::fcm_uid.eq(fcm_uid))
             .first::<FcmUid>(conn)
             .await;
 
-        match row_exists {
-            Ok(_) => Ok(true),
-            Err(DslError::NotFound) => Ok(false), // no .optional() in async diesel?
-            Err(e) => Err(e.into()),
-        }
+        Ok(optional(row_exists)?.is_some())
     }
 
     pub async fn update(
         &self,
         address: &Address,
-        fcm_uid: FcmUid,
-        lang: Option<String>,
-        tz_offset: Option<i32>,
+        fcm_uid: &FcmUid,
+        language: Option<String>,
+        utc_offset_seconds: Option<i32>,
         new_fcm_uid: Option<FcmUid>,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
+        #[derive(AsChangeset)]
+        #[diesel(table_name = devices)]
+        struct UpdateableDevice {
+            language: Option<String>,
+            utc_offset_seconds: Option<i32>,
+            fcm_uid: Option<FcmUid>,
+        }
+
         conn.transaction(move |conn| {
+            let updates = UpdateableDevice {
+                language,
+                utc_offset_seconds,
+                fcm_uid: new_fcm_uid,
+            };
             let address = address.as_base58_string();
-            let lang = lang.map(|l| l.to_string());
 
             async move {
-                //TODO Performance issue: the following independent queries can be merged into one
-
-                let updater = diesel::update(
+                diesel::update(
                     devices::table
-                        .filter(devices::fcm_uid.eq(fcm_uid.clone()))
+                        .filter(devices::fcm_uid.eq(fcm_uid))
                         .filter(devices::subscriber_address.eq(address.clone())),
-                );
-
-                if let Some(new_fcm_uid) = new_fcm_uid {
-                    updater
-                        .clone()
-                        .set(devices::fcm_uid.eq(new_fcm_uid))
-                        .execute(conn)
-                        .await?;
-                }
-
-                if let Some(lang) = lang {
-                    updater
-                        .clone()
-                        .set(devices::language.eq(lang))
-                        .execute(conn)
-                        .await?;
-                }
-
-                if let Some(tz) = tz_offset {
-                    updater
-                        .clone()
-                        .set(devices::utc_offset_seconds.eq(tz))
-                        .execute(conn)
-                        .await?;
-                }
+                )
+                .set(&updates)
+                .execute(conn)
+                .await?;
 
                 Ok(())
             }
             .scope_boxed()
         })
         .await
+    }
+}
+
+fn optional<R>(query_result: Result<R, DslError>) -> Result<Option<R>, Error> {
+    match query_result {
+        Ok(r) => Ok(Some(r)),
+        Err(DslError::NotFound) => Ok(None),
+        Err(e) => Err(e.into()),
     }
 }

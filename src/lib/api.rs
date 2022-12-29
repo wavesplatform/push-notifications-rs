@@ -1,6 +1,6 @@
-use crate::{db::PgAsyncPool, device, subscription, Error};
+use crate::{db::PgAsyncPool, device, model::Address, subscription, Error};
 use std::sync::Arc;
-use warp::Filter;
+use warp::{Filter, Rejection};
 use wavesexchange_warp::{
     error::{error_handler_with_serde_qs, handler, internal, validation},
     log::access,
@@ -38,7 +38,11 @@ pub async fn start(
     };
 
     let fcm_uid = warp::header::<String>("X-Fcm-Uid");
-    let user_addr = warp::header::<String>("X-User-Address");
+    let user_addr = warp::header::<String>("X-User-Address").and_then(|addr: String| async move {
+        Address::from_string(&addr)
+            .map_err(|e| Error::AddressParseError(e.to_string()))
+            .map_err(Rejection::from)
+    });
 
     let device_unregister = warp::delete()
         .and(warp::path!("device"))
@@ -121,43 +125,37 @@ mod controllers {
         subscription::{self, SubscriptionRequest, Topic},
         Error,
     };
-    use warp::{http::StatusCode, Rejection, Reply};
+    use warp::{http::StatusCode, reply::Json, Rejection};
 
     pub async fn unregister_device(
         fcm_uid: FcmUid,
-        addr: String,
+        address: Address,
         devices: device::Repo,
         pool: Pool,
-    ) -> Result<impl Reply, Rejection> {
-        let address =
-            Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
-
+    ) -> Result<StatusCode, Rejection> {
         let mut conn = pool.get().await.map_err(Error::from)?;
 
-        devices.unregister(&address, fcm_uid, &mut conn).await?;
+        devices.unregister(&address, &fcm_uid, &mut conn).await?;
         Ok(StatusCode::NO_CONTENT)
     }
 
     pub async fn register_device(
         fcm_uid: FcmUid,
-        addr: String,
+        address: Address,
         devices: device::Repo,
         pool: Pool,
         device_info: dto::NewDevice,
-    ) -> Result<impl Reply, Rejection> {
-        let address =
-            Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
-
+    ) -> Result<StatusCode, Rejection> {
         let mut conn = pool.get().await.map_err(Error::from)?;
 
-        if devices.exists(&address, &mut conn).await? {
+        if devices.exists(&address, &fcm_uid, &mut conn).await? {
             return Ok(StatusCode::NO_CONTENT);
         }
 
         devices
             .register(
                 &address,
-                fcm_uid,
+                &fcm_uid,
                 &device_info.lang.language,
                 device_info.tz.utc_offset_seconds,
                 &mut conn,
@@ -169,14 +167,11 @@ mod controllers {
 
     pub async fn update_device(
         fcm_uid: FcmUid,
-        addr: String,
+        address: Address,
         devices: device::Repo,
         pool: Pool,
         device_info: dto::UpdateDevice,
-    ) -> Result<impl Reply, Rejection> {
-        let address =
-            Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
-
+    ) -> Result<StatusCode, Rejection> {
         let response = if device_info.fcm.is_some() {
             StatusCode::OK
         } else {
@@ -188,7 +183,7 @@ mod controllers {
         devices
             .update(
                 &address,
-                fcm_uid,
+                &fcm_uid,
                 device_info.lang.map(|l| l.language),
                 device_info.tz.map(|tz| tz.utc_offset_seconds),
                 device_info.fcm.map(|fcm| fcm.fcm_uid),
@@ -200,14 +195,11 @@ mod controllers {
     }
 
     pub async fn unsubscribe_from_topics(
-        addr: String,
+        address: Address,
         subscriptions: subscription::Repo,
         pool: Pool,
         topics: Option<dto::Topics>,
-    ) -> Result<impl Reply, Rejection> {
-        let address =
-            Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
-
+    ) -> Result<StatusCode, Rejection> {
         let mut conn = pool.get().await.map_err(Error::from)?;
 
         subscriptions
@@ -218,14 +210,11 @@ mod controllers {
     }
 
     pub async fn subscribe_to_topics(
-        addr: String,
+        address: Address,
         subscriptions: subscription::Repo,
         pool: Pool,
         topics: dto::Topics,
-    ) -> Result<impl Reply, Rejection> {
-        let address =
-            Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
-
+    ) -> Result<StatusCode, Rejection> {
         let subs = topics
             .topics
             .into_iter()
@@ -247,13 +236,10 @@ mod controllers {
     }
 
     pub async fn get_topics(
-        addr: String,
+        address: Address,
         subscriptions: subscription::Repo,
         pool: Pool,
-    ) -> Result<impl Reply, Rejection> {
-        let address =
-            Address::from_string(&addr).map_err(|e| Error::AddressParseError(e.to_string()))?;
-
+    ) -> Result<Json, Rejection> {
         let mut conn = pool.get().await.map_err(Error::from)?;
 
         let topics = subscriptions

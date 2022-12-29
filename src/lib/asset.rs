@@ -65,17 +65,18 @@ impl CachedLoader<Asset, LocalAssetInfo> for RemoteGateway {
     type Error = Error;
 
     async fn load_fn(&mut self, keys: &[Asset]) -> Result<Vec<LocalAssetInfo>, Self::Error> {
-        let mut result = vec![];
-        for asset in keys {
-            let asset_id = asset.id();
-            //TODO It seems that `assets_client.get()` supports bulk loading, so why do we iterate only one by one here?
-            let mut asset = self
-                .assets_client
-                .get([&asset_id], None, OutputFormat::Full, false)
-                .await?;
-            assert_eq!(asset.data.len(), 1);
-            let asset = asset.data.pop().expect("asset[0]");
-            let asset = match asset.data {
+        let asset_ids = keys.iter().map(|k| k.id()).collect::<Vec<_>>();
+        let assets = self
+            .assets_client
+            .get(asset_ids, None, OutputFormat::Full, false)
+            .await?;
+        assert_eq!(assets.data.len(), keys.len());
+
+        Ok(assets
+            .data
+            .into_iter()
+            .zip(keys)
+            .map(|(asset, asset_id)| match asset.data {
                 Some(AssetInfo::Full(a)) => LocalAssetInfo {
                     ticker: a.ticker,
                     decimals: a.precision as u8,
@@ -86,10 +87,8 @@ impl CachedLoader<Asset, LocalAssetInfo> for RemoteGateway {
                 None => {
                     panic!("No AssetInfo for asset {}", asset_id);
                 }
-            };
-            result.push(asset);
-        }
-        Ok(result)
+            })
+            .collect())
     }
 
     fn init_cache() -> Self::Cache {
