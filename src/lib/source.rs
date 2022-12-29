@@ -1,7 +1,7 @@
 //! Blockchain updates
 
 pub mod prices {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, mem::take};
 
     use tokio::sync::{mpsc, oneshot};
 
@@ -13,7 +13,7 @@ pub mod prices {
         asset,
         model::{Address, AssetPair},
         processing::EventWithFeedback,
-        stream::{Event, PriceLowHigh, PriceWithDecimals},
+        stream::{Event, PriceRange, PriceWithDecimals},
     };
 
     pub struct Source {
@@ -86,8 +86,8 @@ pub mod prices {
         fn aggregate_prices_from_block(
             &mut self,
             block: AppendBlock,
-        ) -> HashMap<AssetPair, PriceLowHigh> {
-            let mut block_prices = HashMap::<AssetPair, PriceLowHigh>::new();
+        ) -> HashMap<AssetPair, PriceRange> {
+            let mut block_prices = HashMap::<AssetPair, PriceRange>::new();
 
             for tx in block.transactions {
                 if tx.sender == self.matcher_address {
@@ -106,10 +106,12 @@ pub mod prices {
                             prev_price,
                             new_price
                         );
-                        block_prices
+                        let prev_price = prev_price.value();
+                        let new_price = new_price.value();
+                        let range = block_prices
                             .entry(asset_pair.clone())
-                            .and_modify(|price| *price = price.clone().merge(new_price))
-                            .or_insert_with(|| prev_price.merge(new_price));
+                            .or_insert_with(|| PriceRange::empty().add_excluded(prev_price));
+                        *range = take(range).add_included(new_price);
                     }
                     self.last_prices.insert(asset_pair, new_price);
                 }
@@ -120,7 +122,7 @@ pub mod prices {
 
         async fn send_price_events(
             &self,
-            block_prices: HashMap<AssetPair, PriceLowHigh>,
+            block_prices: HashMap<AssetPair, PriceRange>,
             sink: &mpsc::Sender<EventWithFeedback>,
         ) -> Result<(), Error> {
             for (asset_pair, price_range) in block_prices {
