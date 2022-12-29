@@ -110,8 +110,8 @@ pub mod prices {
                         let new_price = new_price.value();
                         let range = block_prices
                             .entry(asset_pair.clone())
-                            .or_insert_with(|| PriceRange::empty().add_excluded(prev_price));
-                        *range = take(range).add_included(new_price);
+                            .or_insert_with(|| PriceRange::empty().extend(prev_price));
+                        *range = take(range).extend(new_price).exclude_bound(prev_price);
                     }
                     self.last_prices.insert(asset_pair, new_price);
                 }

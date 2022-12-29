@@ -157,27 +157,34 @@ mod impls {
             }
         }
 
-        /// Add inclusive point to the range
-        pub fn add_included(self, price: Price) -> Self {
-            self.add(Bound::Included(price))
-        }
-
-        /// Add exclusive point to the range
-        pub fn add_excluded(self, price: Price) -> Self {
-            self.add(Bound::Excluded(price))
-        }
-
-        fn add(self, price: Bound<Price>) -> Self {
+        /// Extend the range by adding a price to it.
+        pub fn extend(self, price: Price) -> Self {
             debug_assert!(self.low.value() <= self.high.value(), "low <= high");
-            debug_assert!(price != Bound::None);
+            let price_included = Bound::Included(price);
             PriceRange {
-                low: if self.low == Bound::None || price.value() < self.low.value() {
-                    price
+                low: if self.low == Bound::None || price < self.low.value() {
+                    price_included
                 } else {
                     self.low
                 },
-                high: if self.low == Bound::None || price.value() > self.high.value() {
-                    price
+                high: if self.low == Bound::None || price > self.high.value() {
+                    price_included
+                } else {
+                    self.high
+                },
+            }
+        }
+
+        /// Exclude from the range bounds that equals to the given price.
+        pub fn exclude_bound(self, price: Price) -> Self {
+            PriceRange {
+                low: if self.low == Bound::Included(price) {
+                    Bound::Excluded(price)
+                } else {
+                    self.low
+                },
+                high: if self.high == Bound::Included(price) {
+                    Bound::Excluded(price)
                 } else {
                     self.high
                 },
@@ -185,43 +192,16 @@ mod impls {
         }
     }
 
-    #[test]
+    #[test] #[rustfmt::skip]
     fn test_price_range_is_empty() {
         assert_eq!(PriceRange::empty().is_empty(), true);
-        assert_eq!(PriceRange::empty().add_excluded(1.0).is_empty(), true); // still considered empty
-        assert_eq!(PriceRange::empty().add_included(1.0).is_empty(), false); // contains one point
-
-        assert_eq!(
-            PriceRange::empty()
-                .add_included(1.0)
-                .add_included(2.0)
-                .is_empty(),
-            false
-        );
-
-        assert_eq!(
-            PriceRange::empty()
-                .add_included(1.0)
-                .add_excluded(2.0)
-                .is_empty(),
-            false
-        );
-
-        assert_eq!(
-            PriceRange::empty()
-                .add_excluded(1.0)
-                .add_included(2.0)
-                .is_empty(),
-            false
-        );
-
-        assert_eq!(
-            PriceRange::empty()
-                .add_excluded(1.0)
-                .add_excluded(2.0)
-                .is_empty(),
-            false
-        );
+        assert_eq!(PriceRange::empty().exclude_bound(0.0).is_empty(), true);
+        assert_eq!(PriceRange::empty().exclude_bound(1.0).is_empty(), true);
+        assert_eq!(PriceRange::empty().extend(1.0).is_empty(), false);
+        assert_eq!(PriceRange::empty().extend(1.0).exclude_bound(1.0).is_empty(), true);
+        assert_eq!(PriceRange::empty().extend(1.0).extend(2.0).is_empty(), false);
+        assert_eq!(PriceRange::empty().extend(1.0).exclude_bound(2.0).is_empty(), false);
+        assert_eq!(PriceRange::empty().exclude_bound(1.0).extend(1.0).is_empty(), false);
 
         assert!(PriceRange::default().is_empty());
     }
@@ -232,12 +212,12 @@ mod impls {
         assert_eq!(p.is_empty(), true);
         assert_eq!(p.contains(0.0), false);
 
-        let p = PriceRange::empty().add_excluded(42.0);
+        let p = PriceRange::empty().exclude_bound(42.0);
         assert_eq!(p.is_empty(), true);
         assert_eq!(p.contains(0.0), false);
         assert_eq!(p.contains(42.0), false);
 
-        let p = PriceRange::empty().add_included(42.0);
+        let p = PriceRange::empty().extend(42.0);
         assert_eq!(p.is_empty(), false);
         assert_eq!(p.contains(0.0), false);
         assert_eq!(p.contains(42.0), true);
@@ -245,9 +225,12 @@ mod impls {
         assert_eq!(p.contains(42.1), false);
         assert_eq!(p.low_high(), (42.0, 42.0));
 
-        let p = PriceRange::empty()
-            .add_included(123.45)
-            .add_included(120.00);
+        let p = PriceRange::empty().extend(42.0).exclude_bound(42.0);
+        assert_eq!(p.is_empty(), true);
+        assert_eq!(p.contains(0.0), false);
+        assert_eq!(p.contains(42.0), false);
+
+        let p = PriceRange::empty().extend(123.45).extend(120.00);
         assert_eq!(p.low_high(), (120.00, 123.45));
         assert_eq!(p.contains(120.00), true);
         assert_eq!(p.contains(123.00), true);
@@ -256,28 +239,26 @@ mod impls {
         assert_eq!(p.contains(200.00), false);
 
         let p = PriceRange::empty()
-            .add_excluded(123.45)
-            .add_excluded(120.00);
-        assert_eq!(p.low_high(), (120.00, 123.45));
-        assert_eq!(p.contains(120.00), false);
-        assert_eq!(p.contains(123.00), true);
-        assert_eq!(p.contains(123.45), false);
-        assert_eq!(p.contains(100.00), false);
-        assert_eq!(p.contains(200.00), false);
+            .extend(3.0)
+            .extend(1.0)
+            .extend(2.0)
+            .exclude_bound(1.0)
+            .exclude_bound(2.0);
+        assert_eq!(p.low_high(), (1.0, 3.0));
+        assert_eq!(p.contains(1.0), false);
+        assert_eq!(p.contains(2.0), true);
+        assert_eq!(p.contains(3.0), true);
 
         let p = PriceRange::empty()
-            .add_excluded(123.45)
-            .add_excluded(120.00)
-            .add_excluded(543.21);
-        assert_eq!(p.low_high(), (120.00, 543.21));
-        assert_eq!(p.contains(123.00), true);
-        assert_eq!(p.contains(100.00), false);
-        assert_eq!(p.contains(600.00), false);
-
-        // When the same bound is added again, it does not override existing bound
-        let p = PriceRange::empty().add_excluded(1.0).add_included(1.0);
-        assert_eq!(p.is_empty(), true); // (1, 1) + [1] = (1, 1)
-        let p = PriceRange::empty().add_included(1.0).add_excluded(1.0);
-        assert_eq!(p.is_empty(), false); // [1, 1] + (1) = [1, 1]
+            .extend(3.0)
+            .extend(1.0)
+            .extend(2.0)
+            .exclude_bound(3.0)
+            .exclude_bound(5.0);
+        assert_eq!(p.low_high(), (1.0, 3.0));
+        assert_eq!(p.contains(1.0), true);
+        assert_eq!(p.contains(2.0), true);
+        assert_eq!(p.contains(3.0), false);
+        assert_eq!(p.contains(5.0), false);
     }
 }
