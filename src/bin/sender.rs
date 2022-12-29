@@ -9,6 +9,7 @@ use lib::{
     config::{self, sender},
     Error,
 };
+use std::fmt;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -25,10 +26,6 @@ async fn main() -> Result<(), Error> {
 
         match message_to_send {
             None => {
-                log::debug!(
-                    "No messages, sleep for {:?}s",
-                    config.empty_queue_poll_period.num_seconds()
-                );
                 tokio::time::sleep(config.empty_queue_poll_period.to_std().unwrap()).await;
                 // .unwrap() is safe, non-negativity is validated on config load (u32)
             }
@@ -36,14 +33,13 @@ async fn main() -> Result<(), Error> {
                 let fcm_msg = message.to_fcm(&config.fcm_api_key);
                 // todo ttl
 
-                log::debug!("Sending {:?}", fcm_msg);
-
                 match Ok::<fcm::Message, fcm::FcmError>(fcm_msg).map(|_| ()) {
                     // match fcm::Client::new().send(fcm_msg).await.map(|_| ()) {
                     Ok(()) => {
-                        log::info!("SENT message UID: {}", message.uid);
+                        log::info!("SENT message #{}", message.uid);
+                        log::debug!("BODY: {:?}", message);
                         postgres::ack(&mut conn, message.uid)?;
-                        log::debug!("DB DELETE {:?}", message);
+                        log::debug!("DB DELETE message #{}", message.uid);
                     }
                     Err(err) => {
                         log::error!("Failed to send message {} | {:?}", message.uid, err);
@@ -77,7 +73,7 @@ async fn main() -> Result<(), Error> {
     }
 }
 
-#[derive(Debug, Clone, Queryable)]
+#[derive(Clone, Queryable)]
 pub struct MessageToSend {
     pub uid: i32,
     pub created_at: DateTime<Utc>,
@@ -118,6 +114,25 @@ impl MessageToSend {
         // todo priority
 
         builder.finalize()
+    }
+}
+
+impl fmt::Debug for MessageToSend {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Intentionally avoid printing fcm_uid for security reasons
+        write!(
+            f,
+            "MessageToSend {{ uid: {}, created_at: {:?}, updated_at: {:?}, send_error: {:?}, send_attempts_count: {}, notification_title: {}, notification_body: {}, data: {:?}, collapse_key: {:?}, fcm_uid: *** }}",
+            self.uid,
+            self.created_at,
+            self.updated_at,
+            self.send_error,
+            self.send_attempts_count,
+            self.notification_title,
+            self.notification_body,
+            self.data,
+            self.collapse_key,
+        )
     }
 }
 
