@@ -9,7 +9,7 @@ use crate::{
     error::Error,
     model::{Address, AsBase58String, Asset},
     schema::{subscriptions, topics_price_threshold},
-    stream::{Event, Price},
+    stream::{Event, Price, PriceRange},
 };
 
 use crate::scoped_futures::ScopedFutureExt;
@@ -178,12 +178,10 @@ impl Repo {
                 asset_pair,
                 price_range,
             } => {
-                let (price_low, price_high) = price_range.low_high();
                 self.matching_price_subscriptions(
                     asset_pair.amount_asset.id(),
                     asset_pair.price_asset.id(),
-                    price_low,
-                    price_high,
+                    price_range,
                     conn,
                 )
                 .await
@@ -197,10 +195,10 @@ impl Repo {
         &self,
         amount_asset_id: String,
         price_asset_id: String,
-        price_low: Price,
-        price_high: Price,
+        price_range: &PriceRange,
         conn: &mut AsyncPgConnection,
     ) -> Result<Vec<Subscription>, Error> {
+        let (price_low, price_high) = price_range.low_high();
         let rows = topics_price_threshold::table
             .inner_join(
                 subscriptions::table
@@ -212,16 +210,22 @@ impl Repo {
                 subscriptions::created_at,
                 subscriptions::topic_type,
                 subscriptions::topic,
+                topics_price_threshold::price_threshold,
             ))
             .filter(topics_price_threshold::amount_asset_id.eq(amount_asset_id))
             .filter(topics_price_threshold::price_asset_id.eq(price_asset_id))
             .filter(topics_price_threshold::price_threshold.between(price_low, price_high))
             .order(subscriptions::uid)
-            .load::<(i32, String, DateTime<Utc>, i32, String)>(conn)
+            .load::<(i32, String, DateTime<Utc>, i32, String, f64)>(conn)
             .await?;
 
         rows.into_iter()
-            .map(|(uid, address, created_at, topic_type, topic)| {
+            .filter(|&(_, _, _, _, _, threshold)| {
+                // Since we've used simple BETWEEN filter in SQL query,
+                // there can be extra rows that we need to filter properly.
+                price_range.contains(threshold)
+            })
+            .map(|(uid, address, created_at, topic_type, topic, _)| {
                 Ok(Subscription {
                     uid,
                     subscriber: Address::from_string(&address).expect("address in db"),
