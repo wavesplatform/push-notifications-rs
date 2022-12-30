@@ -1,10 +1,11 @@
 //! Blockchain updates
 
 pub mod prices {
-    use std::{collections::HashMap, mem::take};
+    use std::collections::HashMap;
 
     use tokio::sync::{mpsc, oneshot};
 
+    use self::aggregator::PriceAggregator;
     use super::{
         blockchain_updates::{AppendBlock, BlockchainUpdate, BlockchainUpdatesClient},
         data_service::load_pairs,
@@ -18,14 +19,14 @@ pub mod prices {
 
     pub struct Source {
         matcher_address: Address,
-        last_prices: HashMap<AssetPair, PriceWithDecimals>,
+        aggregators: HashMap<AssetPair, PriceAggregator>,
     }
 
     impl Source {
         pub fn new(matcher_address: Address) -> Self {
             Source {
                 matcher_address,
-                last_prices: HashMap::new(),
+                aggregators: HashMap::new(),
             }
         }
 
@@ -38,7 +39,8 @@ pub mod prices {
             log::info!("Loading pairs from data-service");
             let pairs = load_pairs(data_service_url, assets).await?;
             for pair in pairs {
-                self.last_prices.insert(pair.pair, pair.last_price);
+                let aggregator = PriceAggregator::new(pair.last_price);
+                self.aggregators.insert(pair.pair, aggregator);
             }
             Ok(())
         }
@@ -49,9 +51,15 @@ pub mod prices {
             starting_height: u32,
             sink: mpsc::Sender<EventWithFeedback>,
         ) -> Result<(), anyhow::Error> {
-            log::debug!("Connecting to blockchain-updates: {}", blockchain_updates_url);
+            log::debug!(
+                "Connecting to blockchain-updates: {}",
+                blockchain_updates_url
+            );
             let client = BlockchainUpdatesClient::connect(blockchain_updates_url).await?;
-            log::debug!("Starting receiving blockchain updates from height {}", starting_height);
+            log::debug!(
+                "Starting receiving blockchain updates from height {}",
+                starting_height
+            );
             let mut stream = client.stream(starting_height).await?;
             while let Some(upd) = stream.recv().await {
                 match upd {
@@ -86,8 +94,10 @@ pub mod prices {
         fn aggregate_prices_from_block(
             &mut self,
             block: AppendBlock,
-        ) -> HashMap<AssetPair, PriceRange> {
-            let mut block_prices = HashMap::<AssetPair, PriceRange>::new();
+        ) -> Vec<(AssetPair, PriceRange)> {
+            self.aggregators
+                .values_mut()
+                .for_each(PriceAggregator::reset);
 
             for tx in block.transactions {
                 if tx.sender == self.matcher_address {
@@ -99,47 +109,45 @@ pub mod prices {
                         price: tx.exchange_tx.price,
                         decimals: 8, // This is a hard-coded value
                     };
-                    if let Some(prev_price) = self.last_prices.get(&asset_pair) {
-                        log::trace!(
-                            "Price change: {:?} : {:?} -> {:?}",
-                            asset_pair,
-                            prev_price,
-                            new_price
-                        );
-                        let prev_price = prev_price.value();
-                        let new_price = new_price.value();
-                        let range = block_prices
-                            .entry(asset_pair.clone())
-                            .or_insert_with(|| PriceRange::empty().extend(prev_price));
-                        *range = take(range).extend(new_price).exclude_bound(prev_price);
-                    }
-                    self.last_prices.insert(asset_pair, new_price);
+                    let aggregator = self
+                        .aggregators
+                        .entry(asset_pair)
+                        .or_insert_with(|| PriceAggregator::new(new_price));
+                    aggregator.update(new_price);
                 }
             }
 
-            block_prices
+            self.aggregators
+                .values_mut()
+                .for_each(PriceAggregator::finalize);
+
+            self.aggregators
+                .iter()
+                .map(|(pair, agg)| (pair, agg.range()))
+                .filter(|&(_pair, range)| !range.is_empty())
+                .map(|(pair, range)| (pair.to_owned(), range.to_owned()))
+                .collect()
         }
 
         async fn send_price_events(
             &self,
-            block_prices: HashMap<AssetPair, PriceRange>,
+            block_prices: Vec<(AssetPair, PriceRange)>,
             sink: &mpsc::Sender<EventWithFeedback>,
         ) -> Result<(), Error> {
             for (asset_pair, price_range) in block_prices {
-                if !price_range.is_empty() {
-                    let event = Event::PriceChanged {
-                        asset_pair,
-                        price_range,
-                    };
-                    let (tx, rx) = oneshot::channel();
-                    let evf = EventWithFeedback {
-                        event,
-                        result_tx: tx,
-                    };
-                    sink.send(evf).await.map_err(|_| Error::StopProcessing)?;
-                    let result = rx.await.map_err(|_| Error::StopProcessing)?;
-                    result.map_err(|err| Error::EventProcessingFailed(err))?;
-                }
+                debug_assert_eq!(price_range.is_empty(), false);
+                let event = Event::PriceChanged {
+                    asset_pair,
+                    price_range,
+                };
+                let (tx, rx) = oneshot::channel();
+                let evf = EventWithFeedback {
+                    event,
+                    result_tx: tx,
+                };
+                sink.send(evf).await.map_err(|_| Error::StopProcessing)?;
+                let result = rx.await.map_err(|_| Error::StopProcessing)?;
+                result.map_err(|err| Error::EventProcessingFailed(err))?;
             }
             Ok(())
         }
@@ -148,6 +156,73 @@ pub mod prices {
     enum Error {
         StopProcessing,
         EventProcessingFailed(crate::error::Error),
+    }
+
+    mod aggregator {
+        use crate::stream::{PriceRange, PriceWithDecimals};
+        use std::mem::take;
+
+        pub(super) struct PriceAggregator {
+            prev_block_price: PriceWithDecimals,
+            latest_price: PriceWithDecimals,
+            current_range: PriceRange,
+        }
+
+        impl PriceAggregator {
+            pub(super) fn new(last_known_price: PriceWithDecimals) -> Self {
+                PriceAggregator {
+                    prev_block_price: last_known_price,
+                    latest_price: last_known_price,
+                    current_range: PriceRange::empty(),
+                }
+            }
+
+            pub(super) fn reset(&mut self) {
+                self.current_range = PriceRange::empty();
+            }
+
+            pub(super) fn update(&mut self, new_price: PriceWithDecimals) {
+                let current_range = &mut self.current_range;
+                *current_range = take(current_range).extend(new_price.value());
+                self.latest_price = new_price;
+            }
+
+            pub(super) fn finalize(&mut self) {
+                let current_range = &mut self.current_range;
+                *current_range = take(current_range)
+                    .extend(self.prev_block_price.value())
+                    .exclude_bound(self.prev_block_price.value());
+                self.prev_block_price = self.latest_price;
+            }
+
+            pub(super) fn range(&self) -> &PriceRange {
+                &self.current_range
+            }
+        }
+
+        #[test]
+        fn test_aggregator() {
+            let p = |price, decimals| PriceWithDecimals { price, decimals };
+            let mut agg = PriceAggregator::new(p(0, 0));
+
+            let threshold = 5.0;
+
+            // Block 1: range = [4..5], hit threshold 5, close_price = 5
+            agg.update(p(400, 2));
+            agg.update(p(450, 2));
+            agg.update(p(500, 2));
+            agg.finalize();
+            let range = agg.range();
+            assert_eq!(range.contains(threshold), true);
+
+            // Block 2: range = (5..6], threshold 5 not hit again
+            agg.reset();
+            agg.update(p(550, 2));
+            agg.update(p(600, 2));
+            agg.finalize();
+            let range = agg.range();
+            assert_eq!(range.contains(threshold), false);
+        }
     }
 }
 
