@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     error::Error,
     message::{LocalizedMessage, Message},
-    model::Lang,
+    model::{Lang, Timestamp},
     stream::{OrderExecution, OrderSide},
 };
 
@@ -115,9 +115,8 @@ impl Repo {
     }
 }
 
-fn format_date_time(unix_timestamp: i64) -> (String, String) {
-    use chrono::{TimeZone, Utc};
-    if let Some(dt) = Utc.timestamp_millis_opt(unix_timestamp).earliest() {
+fn format_date_time(timestamp: Timestamp) -> (String, String) {
+    if let Some(dt) = timestamp.date_time() {
         let dt = dt.naive_utc();
         let date = dt.date().format("%Y-%m-%d").to_string();
         let time = dt.time().format("%H:%M:%S").to_string();
