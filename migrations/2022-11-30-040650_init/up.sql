@@ -68,6 +68,6 @@ END;
 $$
 LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER trigger_unsub_cleanup AFTER DELETE ON subscriptions
+CREATE TRIGGER trigger_unsub_cleanup AFTER DELETE ON subscriptions
     FOR EACH ROW
     EXECUTE PROCEDURE unsub_cleanup();
