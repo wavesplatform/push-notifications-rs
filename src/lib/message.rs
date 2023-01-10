@@ -16,11 +16,13 @@ pub enum Message {
         amount_asset_ticker: String,
         price_asset_ticker: String,
         execution: OrderExecution,
+        timestamp: i64,
     },
     PriceThresholdReached {
         amount_asset_ticker: String,
         price_asset_ticker: String,
         threshold: Price, // decimals already applied
+        timestamp: i64,
     },
 }
 

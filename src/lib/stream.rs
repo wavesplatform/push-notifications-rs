@@ -77,10 +77,12 @@ pub enum Event {
         side: OrderSide,
         asset_pair: AssetPair,
         execution: OrderExecution,
+        timestamp: i64,
     },
     PriceChanged {
         asset_pair: AssetPair,
         price_range: PriceRange,
+        timestamp: i64,
     },
 }
 

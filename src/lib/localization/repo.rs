@@ -89,8 +89,10 @@ impl Repo {
             Message::PriceThresholdReached { threshold, .. } => format!("{}", threshold),
         };
 
-        let date = "?"; //TODO Need date field in the message
-        let time = "?"; //TODO Need time field in the message
+        let (date, time) = match message {
+            Message::OrderExecuted { timestamp, .. }
+            | Message::PriceThresholdReached { timestamp, .. } => format_date_time(*timestamp),
+        };
 
         let title = translate(title_key)?;
         let body = translate(body_key)?;
@@ -102,13 +104,25 @@ impl Repo {
             ("pair", &pair),
             ("side", side),
             ("value", &value),
-            ("date", date),
-            ("time", time),
+            ("date", &date),
+            ("time", &time),
         ]);
 
         Some(LocalizedMessage {
             notification_title: interpolate(title, &subst),
             notification_body: interpolate(body, &subst),
         })
+    }
+}
+
+fn format_date_time(unix_timestamp: i64) -> (String, String) {
+    use chrono::{TimeZone, Utc};
+    if let Some(dt) = Utc.timestamp_millis_opt(unix_timestamp).earliest() {
+        let dt = dt.naive_utc();
+        let date = dt.date().format("%Y-%m-%d").to_string();
+        let time = dt.time().format("%H:%M:%S").to_string();
+        (date, time)
+    } else {
+        ("?".to_string(), "?".to_string())
     }
 }

@@ -177,6 +177,7 @@ impl Repo {
             Event::PriceChanged {
                 asset_pair,
                 price_range,
+                ..
             } => {
                 self.matching_price_subscriptions(
                     asset_pair.amount_asset.id(),

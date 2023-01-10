@@ -113,6 +113,7 @@ impl MessagePump {
                     side,
                     asset_pair: event_assets,
                     execution,
+                    timestamp,
                 },
                 Topic::OrderFulfilled {
                     amount_asset: topic_amount_asset,
@@ -128,12 +129,14 @@ impl MessagePump {
                     amount_asset_ticker: self.asset_ticker(amount_asset).await?,
                     price_asset_ticker: self.asset_ticker(price_asset).await?,
                     execution: *execution,
+                    timestamp: *timestamp,
                 }
             }
             (
                 Event::PriceChanged {
                     asset_pair: event_assets,
                     price_range,
+                    timestamp,
                 },
                 Topic::PriceThreshold {
                     amount_asset: topic_amount_asset,
@@ -149,6 +152,7 @@ impl MessagePump {
                     amount_asset_ticker: self.asset_ticker(amount_asset).await?,
                     price_asset_ticker: self.asset_ticker(price_asset).await?,
                     threshold: *price_threshold,
+                    timestamp: *timestamp,
                 }
             }
             (_, _) => unreachable!("unrecognized combination of subscription and event"),
