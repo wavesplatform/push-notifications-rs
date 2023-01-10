@@ -82,3 +82,32 @@ impl fmt::Debug for AssetPair {
         write!(f, "{}/{}", self.amount_asset, self.price_asset)
     }
 }
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Timestamp(i64);
+
+impl Timestamp {
+    pub fn from_unix_timestamp_millis(unix_timestamp: i64) -> Self {
+        Timestamp(unix_timestamp)
+    }
+
+    pub fn unix_timestamp_millis(&self) -> i64 {
+        self.0
+    }
+
+    pub fn date_time(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        use chrono::{TimeZone, Utc};
+        let unix_timestamp = self.unix_timestamp_millis();
+        Utc.timestamp_millis_opt(unix_timestamp).earliest()
+    }
+}
+
+impl fmt::Debug for Timestamp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(dt) = self.date_time() {
+            write!(f, "{}", dt.format("%+")) // like "2001-07-08T00:34:60.026490+09:30"
+        } else {
+            write!(f, "{}", self.unix_timestamp_millis())
+        }
+    }
+}

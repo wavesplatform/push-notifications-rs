@@ -12,7 +12,7 @@ pub mod prices {
     };
     use crate::{
         asset,
-        model::{Address, AssetPair},
+        model::{Address, AssetPair, Timestamp},
         processing::EventWithFeedback,
         stream::{Event, PriceRange, PriceWithDecimals},
     };
@@ -87,8 +87,9 @@ pub mod prices {
             sink: &mpsc::Sender<EventWithFeedback>,
         ) -> Result<(), Error> {
             //log::trace!("Processing block {} at height {}", block.block_id, block.height);
+            let timestamp = block.timestamp;
             let block_prices = self.aggregate_prices_from_block(block);
-            self.send_price_events(block_prices, sink).await
+            self.send_price_events(block_prices, timestamp, sink).await
         }
 
         fn aggregate_prices_from_block(
@@ -132,6 +133,7 @@ pub mod prices {
         async fn send_price_events(
             &self,
             block_prices: Vec<(AssetPair, PriceRange)>,
+            timestamp: Timestamp,
             sink: &mpsc::Sender<EventWithFeedback>,
         ) -> Result<(), Error> {
             for (asset_pair, price_range) in block_prices {
@@ -139,6 +141,7 @@ pub mod prices {
                 let event = Event::PriceChanged {
                     asset_pair,
                     price_range,
+                    timestamp,
                 };
                 let (tx, rx) = oneshot::channel();
                 let evf = EventWithFeedback {
@@ -304,7 +307,7 @@ mod blockchain_updates {
     };
 
     use crate::{
-        model::{Address, Asset},
+        model::{Address, Asset, Timestamp},
         stream::RawPrice,
     };
 
@@ -317,9 +320,10 @@ mod blockchain_updates {
     #[allow(dead_code)] // fields `block_id`, `height` and `is_microblock` are never read
     #[derive(Debug)]
     pub(super) struct AppendBlock {
-        pub block_id: String,
-        pub height: u32,
-        pub is_microblock: bool,
+        pub block_id: String,     // Do we needed it?
+        pub height: u32,          // Do we need it?
+        pub timestamp: Timestamp, // Either block timestamp or current system time for microblock
+        pub is_microblock: bool,  // Do we need it?
         pub transactions: Vec<Transaction>,
     }
 
@@ -334,7 +338,7 @@ mod blockchain_updates {
     pub(super) struct Transaction {
         pub id: String,
         pub height: u32,
-        pub timestamp: u64,
+        pub timestamp: u64, // Not usable as it may be +- several hours from actual
         pub sender: Address,
         pub exchange_tx: TxExchange,
     }
@@ -429,7 +433,7 @@ mod blockchain_updates {
             pub(super) use super::super::{
                 AppendBlock, BlockchainUpdate, Rollback, Transaction, TxExchange,
             };
-            pub(super) use crate::model::{Address, Asset, AssetId};
+            pub(super) use crate::model::{Address, Asset, AssetId, Timestamp};
         }
 
         #[derive(Error, Debug)]
@@ -449,11 +453,20 @@ mod blockchain_updates {
                         transactions_metadata,
                         ..
                     } = append;
+
                     let is_microblock = extract_is_microblock(&body)
                         .ok_or(ConvertError("failed to extract is_microblock"))?;
+
                     let id = extract_id(&body, &src.id)
                         .ok_or(ConvertError("failed to extract block id"))?;
                     let id = base58(id);
+
+                    // Only full blocks have timestamp, microblocks doesn't.
+                    // But it is okay to use current system time in case of a microblock,
+                    // because it will differ from a real microblock timestamp by a negligible margin.
+                    // Though, it is a hack.
+                    let timestamp = extract_timestamp(&body).unwrap_or_else(current_timestamp);
+
                     let transactions =
                         extract_transactions(body).ok_or(ConvertError("transactions is None"))?;
                     assert!(
@@ -466,9 +479,11 @@ mod blockchain_updates {
                         transactions_metadata,
                         height,
                     )?;
+
                     let append = model::AppendBlock {
                         block_id: id,
                         height,
+                        timestamp,
                         is_microblock,
                         transactions,
                     };
@@ -505,6 +520,34 @@ mod blockchain_updates {
                 }) => Some(total_block_id),
                 _ => None,
             }
+        }
+
+        fn extract_timestamp(body: &proto::Body) -> Option<model::Timestamp> {
+            if let proto::Body::Block(proto::BlockAppend {
+                block:
+                    Some(proto::Block {
+                        header: Some(ref header),
+                        ..
+                    }),
+                ..
+            }) = body
+            {
+                let ts = header.timestamp;
+                let ts = model::Timestamp::from_unix_timestamp_millis(ts);
+                Some(ts)
+            } else {
+                None
+            }
+        }
+
+        fn current_timestamp() -> model::Timestamp {
+            use std::time::{SystemTime, UNIX_EPOCH};
+            let now = SystemTime::now();
+            // Panics if server is placed inside a time machine
+            assert!(now > UNIX_EPOCH, "Current time is before the Unix Epoch");
+            // Call to `unwrap()` is safe here because we checked time with the assert
+            let ts = now.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
+            model::Timestamp::from_unix_timestamp_millis(ts)
         }
 
         fn extract_transactions(body: proto::Body) -> Option<Vec<proto::SignedTransaction>> {
