@@ -14,6 +14,7 @@ pub struct Config {
     pub exponential_backoff_multiplier: f32,
     pub send_max_attempts: u8,
     pub fcm_api_key: String,
+    pub dry_run: bool,
 }
 
 impl Config {
@@ -34,6 +35,7 @@ impl From<ConfigFlat> for Config {
             exponential_backoff_multiplier: conf.send_exponential_backoff_multiplier,
             send_max_attempts: conf.send_max_attempts,
             fcm_api_key: conf.fcm_api_key,
+            dry_run: conf.send_dry_run,
         }
     }
 }
@@ -49,6 +51,8 @@ struct ConfigFlat {
     #[serde(default = "default_send_max_attempts")]
     send_max_attempts: u8,
     fcm_api_key: String,
+    #[serde(default = "default_send_dry_run")]
+    send_dry_run: bool,
 }
 
 fn default_empty_queue_poll_period() -> u32 {
@@ -65,6 +69,10 @@ fn default_exponential_backoff_multiplier() -> f32 {
 
 fn default_send_max_attempts() -> u8 {
     5
+}
+
+fn default_send_dry_run() -> bool {
+    false
 }
 
 impl fmt::Debug for Config {
