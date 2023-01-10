@@ -3005,8 +3005,8 @@ dependencies = [
 
 [[package]]
 name = "wavesexchange_apis"
-version = "0.1.17"
-source = "git+https://github.com/waves-exchange/wavesexchange-rs?tag=wavesexchange_apis/0.1.17#f93bfa5eb5d1c5bd089219e157e7083a0c02aeb3"
+version = "0.1.18"
+source = "git+https://github.com/waves-exchange/wavesexchange-rs?tag=wavesexchange_apis/0.1.18#c7c80bd1809a7a9b24f64ddd693559d912630248"
 dependencies = [
  "async-recursion",
  "base64 0.20.0",

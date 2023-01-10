@@ -24,6 +24,7 @@
 | DATA_SERVICE_URL       | YES      |         | Data-service root url. No trailing slash   |
 | BLOCKCHAIN_UPDATES_URL | YES      |         | Blockchain updates url                     |
 | MATCHER_ADDRESS        | YES      |         | Matcher address (base58)                   |
+| STARTING_HEIGHT        | NO       | None    | [Debug only] Blockchain height to start receiving notifications.<br/>If not set (or zero) uses current height from data  service. |
 
 ### API
 

@@ -10,7 +10,7 @@ pub struct Config {
     pub lokalise_token: String,
     pub lokalise_project_id: String,
     pub blockchain_updates_url: String,
-    pub starting_height: u32,
+    pub starting_height: Option<u32>,
     pub matcher_address: Address,
     pub data_service_url: String,
 }
@@ -23,7 +23,11 @@ impl Config {
             lokalise_token: config.lokalise_token,
             lokalise_project_id: config.lokalise_project_id,
             blockchain_updates_url: config.blockchain_updates_url,
-            starting_height: config.starting_height,
+            starting_height: if config.starting_height != Some(0) {
+                config.starting_height
+            } else {
+                None
+            },
             matcher_address: Address::from_string(&config.matcher_address)
                 .map_err(|_| Error::BadConfigValue("matcher_address"))?,
             data_service_url: config.data_service_url,
@@ -37,13 +41,8 @@ struct RawConfig {
     assets_service_url: String,
     data_service_url: String,
     blockchain_updates_url: String,
-    #[serde(default = "default_starting_height")]
-    starting_height: u32,
+    starting_height: Option<u32>,
     matcher_address: String,
     lokalise_token: String,
     lokalise_project_id: String,
-}
-
-fn default_starting_height() -> u32 {
-    1
 }
