@@ -8,7 +8,7 @@ use reqwest::Url;
 use crate::{
     error::Error,
     model::{Address, AsBase58String, Asset},
-    schema::{subscriptions, topics_price_threshold},
+    schema::{subscribers, subscriptions, topics_price_threshold},
     stream::{Event, Price, PriceRange},
 };
 
@@ -271,6 +271,12 @@ impl Repo {
 
         conn.transaction(move |conn| {
             async move {
+                diesel::insert_into(subscribers::table)
+                    .values(subscribers::address.eq(address.as_base58_string()))
+                    .on_conflict_do_nothing()
+                    .execute(conn)
+                    .await?;
+
                 let uids = diesel::insert_into(subscriptions::table)
                     .values(rows)
                     .on_conflict_do_nothing()
@@ -304,6 +310,7 @@ impl Repo {
                 if new_price_threshold_topics.len() > 0 {
                     diesel::insert_into(topics_price_threshold::table)
                         .values(new_price_threshold_topics)
+                        .on_conflict_do_nothing()
                         .execute(conn)
                         .await?;
                 }
