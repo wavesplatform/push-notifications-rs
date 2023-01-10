@@ -118,6 +118,7 @@ impl Repo {
 fn format_date_time(timestamp: Timestamp) -> (String, String) {
     if let Some(dt) = timestamp.date_time() {
         let dt = dt.naive_utc();
+        //TODO Probably we gonna need the localized format of date and time
         let date = dt.date().format("%Y-%m-%d").to_string();
         let time = dt.time().format("%H:%M:%S").to_string();
         (date, time)
