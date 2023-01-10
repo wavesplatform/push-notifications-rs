@@ -35,9 +35,10 @@ CREATE TABLE IF NOT EXISTS topics_price_threshold (
     amount_asset_id varchar not null,
     price_asset_id varchar not null,
     price_threshold double precision not null,
+
+    UNIQUE (amount_asset_id, price_asset_id, price_threshold),
     foreign key (subscription_uid) references subscriptions(uid) ON DELETE CASCADE
 );
-create index on topics_price_threshold(amount_asset_id, price_asset_id, price_threshold);
 
 CREATE TABLE IF NOT EXISTS messages (
     uid serial not null primary key,
@@ -54,3 +55,19 @@ CREATE TABLE IF NOT EXISTS messages (
     constraint send_attempts_count_u8 check (send_attempts_count >= 0 and send_attempts_count < 256)
 );
 create index on messages(device_uid);
+
+CREATE OR REPLACE FUNCTION unsub_cleanup()
+    RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM subscriptions WHERE subscriber_address = OLD.subscriber_address)
+    AND NOT EXISTS (SELECT FROM devices WHERE subscriber_address = OLD.subscriber_address) THEN
+        DELETE from subscribers WHERE address = OLD.subscriber_address;
+    END IF;
+    RETURN OLD;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trigger_unsub_cleanup AFTER DELETE ON subscriptions
+    FOR EACH ROW
+    EXECUTE PROCEDURE unsub_cleanup();

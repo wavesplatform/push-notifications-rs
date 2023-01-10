@@ -26,6 +26,10 @@ pub async fn start(
             }
             validation::invalid_parameter(ERROR_CODES_PREFIX, error_details)
         }
+        Error::DbQueryError(e) => {
+            log::error!(e);
+            validation::invalid_parameter(ERROR_CODES_PREFIX, None)
+        }
         _ => internal(ERROR_CODES_PREFIX),
     });
 

@@ -1,6 +1,5 @@
 use bb8::RunError;
 use diesel_async::pooled_connection::PoolError;
-use std::collections::HashMap;
 use std::sync::Arc;
 use warp::reject::Reject;
 use wavesexchange_loaders::LoaderError;
@@ -72,12 +71,3 @@ impl From<LoaderError<Error>> for Error {
 }
 
 impl Reject for Error {}
-
-impl Error {
-    pub fn reasoned_validation(param: impl Into<String>, reason: impl Into<String>) -> Self {
-        Error::ValidationError(
-            param.into(),
-            Some(HashMap::from([("reason".to_string(), reason.into())])),
-        )
-    }
-}
