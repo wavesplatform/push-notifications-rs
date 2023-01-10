@@ -21,6 +21,12 @@ async fn main() -> Result<(), Error> {
     log::info!("Connecting to postgres database: {:?}", pg_config);
     let mut conn = PgConnection::establish(&pg_config.database_url())?;
 
+    let fcm = FcmRemoteGateway {
+        client: fcm::Client::new(),
+        api_key: config.fcm_api_key,
+        dry_run: config.dry_run,
+    };
+
     loop {
         let message_to_send = postgres::dequeue(&mut conn, config.send_max_attempts as i16)?;
 
@@ -30,11 +36,8 @@ async fn main() -> Result<(), Error> {
                 // .unwrap() is safe, non-negativity is validated on config load (u32)
             }
             Some(message) => {
-                let fcm_msg = message.to_fcm(&config.fcm_api_key);
                 // todo ttl
-
-                match Ok::<fcm::Message, fcm::FcmError>(fcm_msg).map(|_| ()) {
-                    // match fcm::Client::new().send(fcm_msg).await.map(|_| ()) {
+                match fcm.send(&message).await {
                     Ok(()) => {
                         log::info!("SENT message #{}", message.uid);
                         log::debug!("BODY: {:?}", message);
@@ -88,35 +91,6 @@ pub struct MessageToSend {
     pub fcm_uid: String,
 }
 
-impl MessageToSend {
-    pub fn to_fcm<'a>(&'a self, fcm_api_key: &'a str) -> fcm::Message<'a> {
-        let notification = {
-            let mut builder = fcm::NotificationBuilder::new();
-            builder.title(&self.notification_title);
-            builder.body(&self.notification_body);
-            builder.finalize()
-        };
-
-        let mut builder = fcm::MessageBuilder::new(fcm_api_key.as_ref(), &self.fcm_uid);
-        builder.notification(notification);
-
-        // message must have `data` field from DB or at least an empty object
-        builder
-            .data(self.data.as_ref().unwrap_or(&serde_json::json!("{}")))
-            .unwrap(); // serde_json::Value guarantees success
-
-        // todo collapse key
-        // if let Some(k) = collapse_key {
-        // builder.collapse_key(&k);
-        // }
-
-        // todo ttl
-        // todo priority
-
-        builder.finalize()
-    }
-}
-
 impl fmt::Debug for MessageToSend {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Intentionally avoid printing fcm_uid for security reasons
@@ -133,6 +107,49 @@ impl fmt::Debug for MessageToSend {
             self.data,
             self.collapse_key,
         )
+    }
+}
+
+struct FcmRemoteGateway {
+    client: fcm::Client,
+    api_key: String,
+    dry_run: bool,
+}
+
+impl FcmRemoteGateway {
+    pub async fn send(&self, message: &MessageToSend) -> Result<(), Error> {
+        if !self.dry_run {
+            let fcm_msg = self.fcm_message(&message);
+            self.client.send(fcm_msg).await?; // todo handle errors from FcmResponse body
+        }
+        Ok(())
+    }
+
+    fn fcm_message<'a: 'b, 'b>(&'a self, message: &'b MessageToSend) -> fcm::Message<'b> {
+        let notification = {
+            let mut builder = fcm::NotificationBuilder::new();
+            builder.title(&message.notification_title);
+            builder.body(&message.notification_body);
+            builder.finalize()
+        };
+
+        let mut builder = fcm::MessageBuilder::new(&self.api_key, &message.fcm_uid);
+        builder.notification(notification);
+
+        // message must have `data` field from DB or at least an empty object
+        builder
+            .data(message.data.as_ref().unwrap_or(&serde_json::json!("{}")))
+            .unwrap(); // serde_json::Value guarantees success
+
+        // todo collapse key
+        // if let Some(k) = collapse_key {
+        // builder.collapse_key(&k);
+        // }
+
+        // todo ttl
+        // todo priority
+
+        builder.finalize()
     }
 }
 
