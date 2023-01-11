@@ -3,7 +3,10 @@
 pub mod prices {
     use std::collections::HashMap;
 
-    use tokio::sync::{mpsc, oneshot};
+    use tokio::{
+        sync::{mpsc, oneshot},
+        try_join,
+    };
 
     use self::aggregator::PriceAggregator;
     use super::{
@@ -35,10 +38,12 @@ pub mod prices {
 
     impl SourceFactory<'_> {
         pub async fn new_source(self) -> anyhow::Result<Source> {
-            let initial_prices = self.load_initial_prices().await?;
-            let starting_height = self.load_starting_height().await?;
-            let client = self.create_grpc_client().await?;
-            let updates_stream = client.stream(starting_height).await?;
+            let initial_prices = self.load_initial_prices();
+            let starting_height = self.load_starting_height();
+            let client = self.create_grpc_client();
+            let (client, starting_height) = try_join!(client, starting_height)?;
+            let updates_stream = client.stream(starting_height);
+            let (initial_prices, updates_stream) = try_join!(initial_prices, updates_stream)?;
             let res = Source {
                 stream: updates_stream,
                 matcher_address: self.matcher_address.to_owned(),

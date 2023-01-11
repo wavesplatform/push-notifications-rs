@@ -43,7 +43,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let subscriptions = subscription::Repo {};
     let assets = asset::RemoteGateway::new(config.assets_service_url);
     let devices = device::Repo {};
-    let localizer = localization::Repo::new(lokalise_config).await?;
+    let localizer = task::spawn(localization::Repo::new(lokalise_config));
     let messages = message::Queue {};
 
     // Create event sources
@@ -70,6 +70,9 @@ async fn main() -> Result<(), anyhow::Error> {
     let h_prices_source = task::spawn(prices_source.run(events_tx.clone()));
     //todo start other sources cloning events_tx
     drop(events_tx); // Make sure only sources now have the tx side of the channel
+
+    // Await on all remaining initialization tasks running in background
+    let localizer = localizer.await??;
 
     // Event processor
     log::info!("Initialization finished, starting service");
