@@ -232,17 +232,20 @@ pub mod prices {
 mod data_service {
     use crate::{
         asset,
-        model::{Asset, AssetPair},
+        model::{Address, AsBase58String, Asset, AssetPair},
         stream::PriceWithDecimals,
     };
     use anyhow::ensure;
     use wavesexchange_apis::{
         bigdecimal::ToPrimitive,
-        data_service::{dto, DataService},
+        data_service::{
+            dto::{self, Sort},
+            DataService,
+        },
         HttpClient,
     };
 
-    pub struct Pair {
+    pub(super) struct Pair {
         pub pair: AssetPair,
         pub last_price: PriceWithDecimals,
     }
@@ -293,7 +296,39 @@ mod data_service {
         };
         Ok(pair)
     }
+
+    pub async fn load_current_blockchain_height(
+        data_service_url: &str,
+        matcher_address: &Address,
+    ) -> Result<u32, anyhow::Error> {
+        log::timer!("Current blockchain height loading", level = info);
+        let client = HttpClient::<DataService>::from_base_url(data_service_url);
+        let matcher_address = matcher_address.as_base58_string();
+        let mut res = client
+            .transactions_exchange(
+                Some(matcher_address),
+                None::<&str>,
+                None::<&str>,
+                None,
+                None,
+                Sort::Desc,
+                1,
+                None::<&str>,
+            )
+            .await?;
+        anyhow::ensure!(
+            !res.items.is_empty(),
+            "Unable to fetch current blockchain height: no Exchange transactions in Data Service"
+        );
+        assert_eq!(res.items.len(), 1, "Broken DS API - unexpected data");
+        let item = res.items.pop().unwrap(); // Unwrap is safe due to the assertion above
+        let tx_data = item.data;
+        log::info!("Current blockchain height is {}", tx_data.height);
+        Ok(tx_data.height)
+    }
 }
+
+pub use data_service::load_current_blockchain_height;
 
 mod blockchain_updates {
     use tokio::{sync::mpsc, task};

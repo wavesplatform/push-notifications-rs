@@ -48,7 +48,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Create event sources
     log::info!("Initializing event sources");
-    let mut prices_source = source::prices::Source::new(config.matcher_address);
+    let mut prices_source = source::prices::Source::new(config.matcher_address.clone());
     prices_source
         .init_prices(&config.data_service_url, assets.clone())
         .await?;
@@ -59,10 +59,23 @@ async fn main() -> Result<(), anyhow::Error> {
     // Start event sources
     log::info!("Starting event sources");
     let h_prices_source = task::spawn(async move {
+        // Starting height in config is mostly for debugging purposes.
+        // For production is should not be set so that we can use current blockchain height.
+        let starting_height = match config.starting_height {
+            None => {
+                source::load_current_blockchain_height(
+                    &config.data_service_url,
+                    &config.matcher_address,
+                )
+                .await?
+            }
+            Some(height) => height,
+        };
+
         prices_source
             .run(
                 config.blockchain_updates_url,
-                config.starting_height,
+                starting_height,
                 events_tx.clone(),
             )
             .await
