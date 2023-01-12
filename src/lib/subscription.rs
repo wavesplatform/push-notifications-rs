@@ -106,14 +106,18 @@ impl Topic {
                 .map_err(|e| topic_err(format!("unknown topic kind: {e}")))?
         };
 
-        match topic_kind {
+        let subscription_mode = match topic_url.query_pairs().find(|(k, _)| k == "oneshot") {
+            Some(_) => SubscriptionMode::Once,
+            None => SubscriptionMode::Repeat,
+        };
+
+        let topic = match topic_kind {
             TopicKind::Orders => {
-                let topic = Topic::OrderFulfilled {
+                Topic::OrderFulfilled {
                     //todo: refactor
                     amount_asset: Asset::Waves,
                     price_asset: Asset::Waves,
-                };
-                Ok((topic, SubscriptionMode::Once))
+                }
             }
             TopicKind::PriceThreshold => {
                 let threshold_info = topic_url
@@ -144,21 +148,15 @@ impl Topic {
                             .map_err(|_| topic_err(format!("invalid threshold_value '{v}'")))
                     })?;
 
-                let subscription_mode = match topic_url.query_pairs().find(|(k, _)| k == "oneshot")
-                {
-                    Some(_) => SubscriptionMode::Once,
-                    None => SubscriptionMode::Repeat,
-                };
-
-                let topic = Topic::PriceThreshold {
+                Topic::PriceThreshold {
                     amount_asset,
                     price_asset,
                     price_threshold,
-                };
-
-                Ok((topic, subscription_mode))
+                }
             }
-        }
+        };
+
+        Ok((topic, subscription_mode))
     }
 
     pub fn as_url_string(&self, mode: SubscriptionMode) -> String {
@@ -426,10 +424,9 @@ mod tests {
                         amount_asset: Asset::Waves,
                         price_asset: Asset::Waves,
                     },
-                    SubscriptionMode::Once,
+                    SubscriptionMode::Repeat,
                 ),
             ),
-            // don't care about ?oneshot in orders as they're always oneshot
             (
                 "push://orders?oneshot",
                 (
