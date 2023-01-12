@@ -4,6 +4,8 @@ use std::sync::Arc;
 use warp::reject::Reject;
 use wavesexchange_loaders::LoaderError;
 
+use crate::subscription::TopicError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("GenericError: {0}")]
@@ -42,14 +44,11 @@ pub enum Error {
     #[error("WxLoaderFailed: {0}")]
     WxLoaderFailed(String),
 
-    #[error("AssetParseError: {0}")]
-    AssetParseError(String),
-
     #[error("AddressParseError: {0}")]
     AddressParseError(String),
 
     #[error("BadTopic: {0}")]
-    BadTopic(String),
+    BadTopic(#[from] TopicError),
 
     #[error("PoolError: {0}")]
     PoolError(#[from] RunError<PoolError>),

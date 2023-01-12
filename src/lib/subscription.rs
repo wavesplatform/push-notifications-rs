@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt::Display};
+use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
 use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl};
@@ -13,6 +13,27 @@ use crate::{
 };
 
 use crate::scoped_futures::ScopedFutureExt;
+
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub enum TopicError {
+    #[error("Unknown scheme, only 'push' is allowed")]
+    UnknownScheme,
+
+    #[error("Topic parse error: {0}")]
+    ParseError(String),
+
+    #[error("Unknown topic kind, only 'orders' and 'price_threshold' are allowed")]
+    UnknownTopicKind(String),
+
+    #[error("Invalid/missing amount asset")]
+    InvalidAmountAsset,
+
+    #[error("Invalid/missing price asset")]
+    InvalidPriceAsset,
+
+    #[error("Invalid/missing threshold value")]
+    InvalidThreshold,
+}
 
 #[derive(Debug)]
 pub struct Subscription {
@@ -66,7 +87,7 @@ impl SubscriptionMode {
 }
 
 impl Topic {
-    pub fn from_url_string(topic_url_raw: &str) -> Result<(Self, SubscriptionMode), Error> {
+    pub fn from_url_string(topic_url_raw: &str) -> Result<(Self, SubscriptionMode), TopicError> {
         enum TopicKind {
             Orders,
             PriceThreshold,
@@ -82,17 +103,12 @@ impl Topic {
             }
         }
 
-        fn topic_err<S: Display>(msg: S) -> Error {
-            Error::BadTopic(msg.to_string())
-        }
-
         let topic_url = {
-            let topic = Url::parse(topic_url_raw).map_err(topic_err)?;
+            let topic =
+                Url::parse(topic_url_raw).map_err(|e| TopicError::ParseError(e.to_string()))?;
             let topic_scheme = topic.scheme();
             if topic_scheme != "push" {
-                return Err(topic_err(format!(
-                    "topic scheme != 'push', but '{topic_scheme}'"
-                )));
+                return Err(TopicError::UnknownScheme);
             }
             topic
         };
@@ -100,10 +116,10 @@ impl Topic {
         let topic_kind = {
             let raw_topic_kind = topic_url
                 .domain()
-                .ok_or_else(|| topic_err("unknown topic kind"))?;
+                .ok_or(TopicError::UnknownTopicKind(String::new()))?;
 
             TopicKind::parse(raw_topic_kind)
-                .map_err(|e| topic_err(format!("unknown topic kind: {e}")))?
+                .map_err(|e| TopicError::UnknownTopicKind(e.to_string()))?
         };
 
         let subscription_mode = match topic_url.query_pairs().find(|(k, _)| k == "oneshot") {
@@ -128,25 +144,18 @@ impl Topic {
 
                 let amount_asset = threshold_info
                     .get(0)
-                    .ok_or_else(|| topic_err("can't find amount asset"))
-                    .and_then(|a| {
-                        Asset::from_id(a).map_err(|_| Error::AssetParseError(a.to_string()))
-                    })?;
+                    .ok_or_else(|| TopicError::InvalidAmountAsset)
+                    .and_then(|a| Asset::from_id(a).map_err(|_| TopicError::InvalidAmountAsset))?;
 
                 let price_asset = threshold_info
                     .get(1)
-                    .ok_or_else(|| topic_err("can't find price asset"))
-                    .and_then(|a| {
-                        Asset::from_id(a).map_err(|_| Error::AssetParseError(a.to_string()))
-                    })?;
+                    .ok_or_else(|| TopicError::InvalidPriceAsset)
+                    .and_then(|a| Asset::from_id(a).map_err(|_| TopicError::InvalidPriceAsset))?;
 
                 let price_threshold = threshold_info
                     .get(2)
-                    .ok_or_else(|| topic_err("can't find threshold value"))
-                    .and_then(|v| {
-                        v.parse()
-                            .map_err(|_| topic_err(format!("invalid threshold_value '{v}'")))
-                    })?;
+                    .ok_or_else(|| TopicError::InvalidThreshold)
+                    .and_then(|v| v.parse().map_err(|_| TopicError::InvalidThreshold))?;
 
                 Topic::PriceThreshold {
                     amount_asset,
@@ -484,14 +493,14 @@ mod tests {
         }
 
         let topic_urls_and_parsed_err = [
-            ("push://pop", "unknown topic kind: pop".to_string()),
             (
-                "shush://orders",
-                "topic scheme != 'push', but 'shush'".to_string(),
+                "push://pop",
+                TopicError::UnknownTopicKind("pop".to_string()),
             ),
+            ("shush://orders", TopicError::UnknownScheme),
             (
                 "push://price_threshold/WAVES/WAVES",
-                "can't find threshold value".to_string(),
+                TopicError::InvalidThreshold,
             ),
             // TODO: current library Asset implementation accepts invalid asset addresses, so this test doesn't fail but should,
             // uncomment after fixing it
@@ -503,11 +512,7 @@ mod tests {
 
         for (url, expected_error) in topic_urls_and_parsed_err {
             let actual_error = Topic::from_url_string(url).unwrap_err();
-            if let Error::BadTopic(msg) | Error::AssetParseError(msg) = actual_error {
-                assert_eq!(msg, expected_error);
-            } else {
-                panic!("error type must be BadTopic or AssetParseError")
-            }
+            assert_eq!(actual_error, expected_error);
         }
     }
 
