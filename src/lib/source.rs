@@ -3,12 +3,15 @@
 pub mod prices {
     use std::collections::HashMap;
 
-    use tokio::sync::{mpsc, oneshot};
+    use tokio::{
+        sync::{mpsc, oneshot},
+        try_join,
+    };
 
     use self::aggregator::PriceAggregator;
     use super::{
         blockchain_updates::{AppendBlock, BlockchainUpdate, BlockchainUpdatesClient},
-        data_service::load_pairs,
+        data_service,
     };
     use crate::{
         asset,
@@ -17,51 +20,80 @@ pub mod prices {
         stream::{Event, PriceRange, PriceWithDecimals},
     };
 
+    /// A factory that creates and initializes instances of `Source`
+    pub struct SourceFactory<'a> {
+        pub data_service_url: &'a str,
+        pub assets: &'a asset::RemoteGateway,
+        pub matcher_address: &'a Address,
+        pub blockchain_updates_url: &'a str,
+        pub starting_height: Option<u32>,
+    }
+
+    /// Source of Price Events (based on blockchain-updates)
     pub struct Source {
+        stream: mpsc::Receiver<BlockchainUpdate>,
         matcher_address: Address,
         aggregators: HashMap<AssetPair, PriceAggregator>,
     }
 
-    impl Source {
-        pub fn new(matcher_address: Address) -> Self {
-            Source {
-                matcher_address,
-                aggregators: HashMap::new(),
-            }
+    impl SourceFactory<'_> {
+        pub async fn new_source(self) -> anyhow::Result<Source> {
+            let initial_prices = self.load_initial_prices();
+            let starting_height = self.load_starting_height();
+            let client = self.create_grpc_client();
+            let (client, starting_height) = try_join!(client, starting_height)?;
+            let updates_stream = client.stream(starting_height);
+            let (initial_prices, updates_stream) = try_join!(initial_prices, updates_stream)?;
+            let res = Source {
+                stream: updates_stream,
+                matcher_address: self.matcher_address.to_owned(),
+                aggregators: initial_prices,
+            };
+            Ok(res)
         }
 
-        //TODO Initialization is an implementation detail. Rework as factory or smth like that.
-        pub async fn init_prices(
-            &mut self,
-            data_service_url: &str,
-            assets: asset::RemoteGateway,
-        ) -> Result<(), anyhow::Error> {
+        async fn load_initial_prices(&self) -> anyhow::Result<HashMap<AssetPair, PriceAggregator>> {
             log::info!("Loading pairs from data-service");
-            let pairs = load_pairs(data_service_url, assets).await?;
+            let pairs = data_service::load_pairs(self.data_service_url, self.assets).await?;
+            let mut res = HashMap::with_capacity(pairs.len());
             for pair in pairs {
                 let aggregator = PriceAggregator::new(pair.last_price);
-                self.aggregators.insert(pair.pair, aggregator);
+                res.insert(pair.pair, aggregator);
             }
-            Ok(())
+            Ok(res)
         }
 
-        pub async fn run(
-            &mut self,
-            blockchain_updates_url: String,
-            starting_height: u32,
-            sink: mpsc::Sender<EventWithFeedback>,
-        ) -> Result<(), anyhow::Error> {
-            log::debug!(
-                "Connecting to blockchain-updates: {}",
-                blockchain_updates_url
-            );
-            let client = BlockchainUpdatesClient::connect(blockchain_updates_url).await?;
-            log::debug!(
-                "Starting receiving blockchain updates from height {}",
-                starting_height
-            );
-            let mut stream = client.stream(starting_height).await?;
-            while let Some(upd) = stream.recv().await {
+        async fn load_starting_height(&self) -> anyhow::Result<u32> {
+            let height = match self.starting_height {
+                Some(height) => {
+                    log::info!("Starting height is configured to be {}", height);
+                    height
+                }
+                None => {
+                    log::info!("Loading height of a latest Exchange transaction from data-service");
+                    let height = data_service::load_current_blockchain_height(
+                        self.data_service_url,
+                        self.matcher_address,
+                    )
+                    .await?;
+                    log::info!("Starting height is {}", height);
+                    height
+                }
+            };
+            Ok(height)
+        }
+
+        async fn create_grpc_client(&self) -> anyhow::Result<BlockchainUpdatesClient> {
+            let url = self.blockchain_updates_url.to_owned();
+            log::debug!("Connecting to blockchain-updates: {}", url);
+            let client = BlockchainUpdatesClient::connect(url).await?;
+            Ok(client)
+        }
+    }
+
+    impl Source {
+        pub async fn run(mut self, sink: mpsc::Sender<EventWithFeedback>) -> anyhow::Result<()> {
+            while let Some(upd) = self.stream.recv().await {
                 match upd {
                     BlockchainUpdate::Append(block) => {
                         let result = self.process_block(block, &sink).await;
@@ -89,7 +121,7 @@ pub mod prices {
             //log::trace!("Processing block {} at height {}", block.block_id, block.height);
             let timestamp = block.timestamp;
             let block_prices = self.aggregate_prices_from_block(block);
-            self.send_price_events(block_prices, timestamp, sink).await
+            Self::send_price_events(block_prices, timestamp, sink).await
         }
 
         fn aggregate_prices_from_block(
@@ -131,7 +163,6 @@ pub mod prices {
         }
 
         async fn send_price_events(
-            &self,
             block_prices: Vec<(AssetPair, PriceRange)>,
             timestamp: Timestamp,
             sink: &mpsc::Sender<EventWithFeedback>,
@@ -252,25 +283,22 @@ mod data_service {
 
     pub(super) async fn load_pairs(
         data_service_url: &str,
-        assets: asset::RemoteGateway,
-    ) -> Result<Vec<Pair>, anyhow::Error> {
+        assets: &asset::RemoteGateway,
+    ) -> anyhow::Result<Vec<Pair>> {
         log::timer!("Pairs loading", level = info);
         let client = HttpClient::<DataService>::from_base_url(data_service_url);
         let pairs = client.pairs().await?;
         let pairs = pairs.items;
         let mut res = Vec::with_capacity(pairs.len());
-        for pair in pairs.into_iter() {
+        for pair in &pairs {
             log::debug!("Loading pair {} / {}", pair.amount_asset, pair.price_asset);
-            let pair = convert_pair(&pair, &assets).await?;
+            let pair = convert_pair(pair, assets).await?;
             res.push(pair);
         }
         Ok(res)
     }
 
-    async fn convert_pair(
-        pair: &dto::Pair,
-        assets: &asset::RemoteGateway,
-    ) -> Result<Pair, anyhow::Error> {
+    async fn convert_pair(pair: &dto::Pair, assets: &asset::RemoteGateway) -> anyhow::Result<Pair> {
         let amount_asset = Asset::from_id(&pair.amount_asset).expect("amt asset");
         let price_asset = Asset::from_id(&pair.price_asset).expect("price asset");
         let last_price_raw = pair.data.last_price.to_u64().expect("price fits u64");
@@ -297,10 +325,10 @@ mod data_service {
         Ok(pair)
     }
 
-    pub async fn load_current_blockchain_height(
+    pub(super) async fn load_current_blockchain_height(
         data_service_url: &str,
         matcher_address: &Address,
-    ) -> Result<u32, anyhow::Error> {
+    ) -> anyhow::Result<u32> {
         log::timer!("Current blockchain height loading", level = info);
         let client = HttpClient::<DataService>::from_base_url(data_service_url);
         let matcher_address = matcher_address.as_base58_string();
@@ -316,9 +344,9 @@ mod data_service {
                 None::<&str>,
             )
             .await?;
-        anyhow::ensure!(
+        ensure!(
             !res.items.is_empty(),
-            "Unable to fetch current blockchain height: no Exchange transactions in Data Service"
+            "Unable to fetch current blockchain height: no Exchange transactions from the matcher in Data Service"
         );
         assert_eq!(res.items.len(), 1, "Broken DS API - unexpected data");
         let item = res.items.pop().unwrap(); // Unwrap is safe due to the assertion above
@@ -327,8 +355,6 @@ mod data_service {
         Ok(tx_data.height)
     }
 }
-
-pub use data_service::load_current_blockchain_height;
 
 mod blockchain_updates {
     use tokio::{sync::mpsc, task};
