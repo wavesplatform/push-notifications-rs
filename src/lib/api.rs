@@ -225,7 +225,7 @@ mod controllers {
             .map(|topic_url| {
                 let (topic, mode) = Topic::from_url_string(&topic_url)?;
                 Ok(SubscriptionRequest {
-                    topic_url,
+                    topic_url: topic.as_url_string(mode),
                     topic,
                     mode,
                 })

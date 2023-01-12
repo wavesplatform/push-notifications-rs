@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashSet, fmt::Display};
 
 use chrono::{DateTime, Utc};
 use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl};
@@ -35,7 +35,7 @@ pub enum SubscriptionMode {
     Repeat,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Topic {
     OrderFulfilled {
         amount_asset: Asset,
@@ -98,7 +98,9 @@ impl Topic {
         };
 
         let topic_kind = {
-            let raw_topic_kind = topic_url.domain().ok_or(topic_err("unknown topic kind"))?;
+            let raw_topic_kind = topic_url
+                .domain()
+                .ok_or_else(|| topic_err("unknown topic kind"))?;
 
             TopicKind::parse(raw_topic_kind)
                 .map_err(|e| topic_err(format!("unknown topic kind: {e}")))?
@@ -155,6 +157,25 @@ impl Topic {
                 };
 
                 Ok((topic, subscription_mode))
+            }
+        }
+    }
+
+    pub fn as_url_string(&self, mode: SubscriptionMode) -> String {
+        match self {
+            Topic::OrderFulfilled { .. } => "push://orders".to_string(),
+            Topic::PriceThreshold {
+                amount_asset,
+                price_asset,
+                price_threshold,
+            } => {
+                let mut url = format!(
+                    "push://price_threshold/{amount_asset}/{price_asset}/{price_threshold}"
+                );
+                if let SubscriptionMode::Once = mode {
+                    url += "?oneshot";
+                }
+                url
             }
         }
     }
@@ -258,19 +279,30 @@ impl Repo {
         subscriptions: Vec<SubscriptionRequest>,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
-        let rows = subscriptions
-            .iter()
-            .map(|subscr| {
-                (
-                    subscriptions::subscriber_address.eq(address.as_base58_string()),
-                    subscriptions::topic.eq(subscr.topic_url.clone()),
-                    subscriptions::topic_type.eq(subscr.mode.to_int() as i32),
-                )
-            })
-            .collect::<Vec<_>>();
-
         conn.transaction(move |conn| {
             async move {
+                let existing_topics: HashSet<String> = HashSet::from_iter(
+                    subscriptions::table
+                        .select(subscriptions::topic)
+                        .get_results::<String>(conn)
+                        .await?,
+                );
+
+                let filtered_subscriptions = subscriptions
+                    .iter()
+                    .filter(|subscr| !existing_topics.contains(&subscr.topic_url));
+
+                let rows = filtered_subscriptions
+                    .clone()
+                    .map(|subscr| {
+                        (
+                            subscriptions::subscriber_address.eq(address.as_base58_string()),
+                            subscriptions::topic.eq(subscr.topic_url.clone()),
+                            subscriptions::topic_type.eq(subscr.mode.to_int() as i32),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
                 diesel::insert_into(subscribers::table)
                     .values(subscribers::address.eq(address.as_base58_string()))
                     .on_conflict_do_nothing()
@@ -279,12 +311,11 @@ impl Repo {
 
                 let uids = diesel::insert_into(subscriptions::table)
                     .values(rows)
-                    .on_conflict_do_nothing()
                     .returning(subscriptions::uid)
                     .get_results::<i32>(conn)
                     .await?;
 
-                let subscr_with_uids = subscriptions.iter().zip(uids.into_iter());
+                let subscr_with_uids = filtered_subscriptions.zip(uids.into_iter());
 
                 let new_price_threshold_topics = subscr_with_uids
                     .filter(|&(subscr, _uid)| matches!(subscr.topic, Topic::PriceThreshold { .. }))
@@ -310,7 +341,6 @@ impl Repo {
                 if new_price_threshold_topics.len() > 0 {
                     diesel::insert_into(topics_price_threshold::table)
                         .values(new_price_threshold_topics)
-                        .on_conflict_do_nothing()
                         .execute(conn)
                         .await?;
                 }
@@ -379,5 +409,146 @@ impl Repo {
             .get_results(conn)
             .await
             .map_err(Error::from)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_topics() {
+        let topic_urls_and_parsed_ok = [
+            (
+                "push://orders",
+                (
+                    Topic::OrderFulfilled {
+                        amount_asset: Asset::Waves,
+                        price_asset: Asset::Waves,
+                    },
+                    SubscriptionMode::Once,
+                ),
+            ),
+            // don't care about ?oneshot in orders as they're always oneshot
+            (
+                "push://orders?oneshot",
+                (
+                    Topic::OrderFulfilled {
+                        amount_asset: Asset::Waves,
+                        price_asset: Asset::Waves,
+                    },
+                    SubscriptionMode::Once,
+                ),
+            ),
+            (
+                "push://price_threshold/8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc/WAVES/500.0",
+                (
+                    Topic::PriceThreshold {
+                        amount_asset: Asset::from_id(
+                            "8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc",
+                        )
+                        .unwrap(),
+                        price_asset: Asset::Waves,
+                        price_threshold: 500.0,
+                    },
+                    SubscriptionMode::Repeat,
+                ),
+            ),
+            (
+                "push://price_threshold/WAVES/8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc/500.0?oneshot",
+                (
+                    Topic::PriceThreshold {
+                        amount_asset: Asset::Waves,
+                        price_asset: Asset::from_id(
+                            "8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc",
+                        )
+                        .unwrap(),
+                        price_threshold: 500.0,
+                    },
+                    SubscriptionMode::Once,
+                ),
+            ),
+            (
+                "push://price_threshold/WAVES/WAVES/-10.5?LKJH=nhwqg734xn&qwe=zxc#asdqwlvkj",
+                (
+                    Topic::PriceThreshold {
+                        amount_asset: Asset::Waves,
+                        price_asset: Asset::Waves,
+                        price_threshold: -10.5,
+                    },
+                    SubscriptionMode::Repeat,
+                ),
+            ),
+        ];
+
+        for (url, expected_result) in topic_urls_and_parsed_ok {
+            let actual_result = Topic::from_url_string(url).unwrap();
+            assert_eq!(actual_result, expected_result);
+        }
+
+        let topic_urls_and_parsed_err = [
+            ("push://pop", "unknown topic kind: pop".to_string()),
+            (
+                "shush://orders",
+                "topic scheme != 'push', but 'shush'".to_string(),
+            ),
+            (
+                "push://price_threshold/WAVES/WAVES",
+                "can't find threshold value".to_string(),
+            ),
+            // TODO: current library Asset implementation accepts invalid asset addresses, so this test doesn't fail but should,
+            // uncomment after fixing it
+            // (
+            //     "push://price_threshold/1234567qwe/WAVES/-10.5",
+            //     "1234567qwe".to_string(),
+            // ),
+        ];
+
+        for (url, expected_error) in topic_urls_and_parsed_err {
+            let actual_error = Topic::from_url_string(url).unwrap_err();
+            if let Error::BadTopic(msg) | Error::AssetParseError(msg) = actual_error {
+                assert_eq!(msg, expected_error);
+            } else {
+                panic!("error type must be BadTopic or AssetParseError")
+            }
+        }
+    }
+
+    #[test]
+    fn topics_as_urls() {
+        let topics_sub_modes_urls = [
+            (
+                Topic::PriceThreshold {
+                    amount_asset: Asset::Waves,
+                    price_asset: Asset::from_id("8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc")
+                        .unwrap(),
+                    price_threshold: 1.7,
+                },
+                SubscriptionMode::Repeat,
+                "push://price_threshold/WAVES/8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc/1.7",
+            ),
+            (
+                Topic::PriceThreshold {
+                    amount_asset: Asset::from_id("8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc")
+                        .unwrap(),
+                    price_asset: Asset::Waves,
+                    price_threshold: 2.,
+                },
+                SubscriptionMode::Once,
+                "push://price_threshold/8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc/WAVES/2?oneshot",
+            ),
+            (
+                Topic::OrderFulfilled {
+                    amount_asset: Asset::Waves,
+                    price_asset: Asset::Waves
+                },
+                SubscriptionMode::Once,
+                "push://orders"
+            )
+        ];
+
+        for (topic, sub_mode, expected_url) in topics_sub_modes_urls {
+            assert_eq!(topic.as_url_string(sub_mode), expected_url);
+        }
     }
 }
