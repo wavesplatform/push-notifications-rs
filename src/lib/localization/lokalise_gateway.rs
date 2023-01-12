@@ -1,7 +1,8 @@
 use crate::error::Error;
 use wavesexchange_apis::HttpClient;
 
-pub(super) const LOCALISE_API_URL: &str = "https://api.lokalise.co/api2";
+//TODO Move to config
+pub(super) const LOCALISE_API_URL: &str = "https://api.lokalise.com/api2";
 
 pub struct LokaliseConfig {
     pub token: String,
