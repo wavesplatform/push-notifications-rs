@@ -291,6 +291,7 @@ impl Repo {
                 let existing_topics: HashSet<String> = HashSet::from_iter(
                     subscriptions::table
                         .select(subscriptions::topic)
+                        .filter(subscriptions::subscriber_address.eq(address.as_base58_string()))
                         .get_results::<String>(conn)
                         .await?,
                 );
