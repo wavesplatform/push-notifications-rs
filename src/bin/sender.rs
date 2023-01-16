@@ -120,7 +120,8 @@ impl FcmRemoteGateway {
     pub async fn send(&self, message: &MessageToSend) -> Result<(), Error> {
         if !self.dry_run {
             let fcm_msg = self.fcm_message(&message);
-            self.client.send(fcm_msg).await?; // todo handle errors from FcmResponse body
+            let fcm_response = self.client.send(fcm_msg).await?; // todo handle errors from FcmResponse body
+            log::debug!("Message #{} {:?}", message.uid, fcm_response);
         }
         Ok(())
     }
