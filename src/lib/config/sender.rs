@@ -80,11 +80,12 @@ impl fmt::Debug for Config {
         // Intentionally avoid printing FCM API Key for security reasons
         write!(
             f,
-            "Sender(empty_queue_poll_period={}s; exponential_backoff_initial_interval={}s; exponential_backoff_multiplier={}; send_max_attempts={}; fcm_api_key=***)",
+            "Sender(empty_queue_poll_period={}s; exponential_backoff_initial_interval={}s; exponential_backoff_multiplier={}; send_max_attempts={}; fcm_api_key=***; dry_run={})",
             self.empty_queue_poll_period.num_seconds(),
             self.exponential_backoff_initial_interval.num_seconds(),
             self.exponential_backoff_multiplier,
-            self.send_max_attempts
+            self.send_max_attempts,
+            self.dry_run,
         )
     }
 }

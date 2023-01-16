@@ -38,4 +38,6 @@ Only [common](###Common)
 | SEND_EMPTY_QUEUE_POLL_PERIOD_MILLIS              | NO       | 5000    | Period of polling for new messages                 |
 | SEND_EXPONENTIAL_BACKOFF_INITIAL_INTERVAL_MILLIS | NO       | 5000    | Message send exponential strategy initial interval |
 | SEND_EXPONENTIAL_BACKOFF_MULTIPLIER              | NO       | 3.0     | Exponential strategy multiplier                    |
-| SEND_SEND_MAX_ATTEMPTS                           | NO       | 5       | No more retries after reaching max attempts limit  |
+| SEND_MAX_ATTEMPTS                           | NO       | 5       | No more retries after reaching max attempts limit  |
+| SEND_DRY_RUN                           | NO       | 5       | No more retries after reaching max attempts limit  |
+
