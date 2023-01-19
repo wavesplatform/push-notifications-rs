@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::model::{AssetPair, Timestamp};
+use crate::model::{Address, AssetPair, Timestamp};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum OrderType {
@@ -77,6 +77,7 @@ pub enum Event {
         side: OrderSide,
         asset_pair: AssetPair,
         execution: OrderExecution,
+        address: Address,
         timestamp: Timestamp,
     },
     PriceChanged {

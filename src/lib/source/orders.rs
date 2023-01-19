@@ -4,7 +4,7 @@ use bigdecimal::BigDecimal;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-    model::{Asset, AssetPair, Timestamp},
+    model::{Address, Asset, AssetPair, Timestamp},
     processing::EventWithFeedback,
     stream::{Event, OrderExecution, OrderSide, OrderType},
 };
@@ -93,6 +93,7 @@ impl Source {
                 },
                 json::OrderStatus::Cancelled => return None,
             },
+            address: Address::from_string(&order.owner_address).expect("order owner address"),
             timestamp: Timestamp::from_unix_timestamp_millis(order.event_timestamp),
         };
         Some(event)
