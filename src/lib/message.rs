@@ -47,14 +47,17 @@ pub enum MessageData {
     OrderPartiallyExecuted {
         amount_asset_id: String,
         price_asset_id: String,
+        address: String,
     },
     OrderExecuted {
         amount_asset_id: String,
         price_asset_id: String,
+        address: String,
     },
     PriceThresholdReached {
         amount_asset_id: String,
         price_asset_id: String,
+        address: String,
     },
 }
 
@@ -68,12 +71,14 @@ mod message_data_serialize_tests {
         let data = MessageData::OrderPartiallyExecuted {
             amount_asset_id: "asset1".to_string(),
             price_asset_id: "asset2".to_string(),
+            address: "1234567890".to_string(),
         };
         let expected_json = json! (
             {
                 "type": "order_partially_executed",
                 "amount_asset_id": "asset1",
                 "price_asset_id": "asset2",
+                "address": "1234567890",
             }
         );
         let value = to_value(data).expect("serialize");
@@ -85,12 +90,14 @@ mod message_data_serialize_tests {
         let data = MessageData::OrderExecuted {
             amount_asset_id: "asset1".to_string(),
             price_asset_id: "asset2".to_string(),
+            address: "1234567890".to_string(),
         };
         let expected_json = json! (
             {
                 "type": "order_executed",
                 "amount_asset_id": "asset1",
                 "price_asset_id": "asset2",
+                "address": "1234567890",
             }
         );
         let value = to_value(data).expect("serialize");
@@ -102,12 +109,14 @@ mod message_data_serialize_tests {
         let data = MessageData::PriceThresholdReached {
             amount_asset_id: "asset1".to_string(),
             price_asset_id: "asset2".to_string(),
+            address: "1234567890".to_string(),
         };
         let expected_json = json! (
             {
                 "type": "price_threshold_reached",
                 "amount_asset_id": "asset1",
                 "price_asset_id": "asset2",
+                "address": "1234567890",
             }
         );
         let value = to_value(data).expect("serialize");

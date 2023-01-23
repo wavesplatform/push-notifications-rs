@@ -1,9 +1,10 @@
 use crate::{
-    asset, device,
+    asset,
+    device::{self, Device},
     error::Error,
     localization,
     message::{self, LocalizedMessage, Message, MessageData, PreparedMessage},
-    model::{Asset, Lang},
+    model::{AsBase58String, Asset, Lang},
     stream::{Event, OrderExecution},
     subscription::{self, SubscriptionMode, Topic},
 };
@@ -77,16 +78,16 @@ impl MessagePump {
             log::debug!("  Subscription: {:?}", subscription);
             let is_oneshot = subscription.mode == SubscriptionMode::Once;
             let msg = self.make_message(&event, &subscription.topic).await?;
-            let meta = self.make_metadata(&event);
             let address = &subscription.subscriber;
             let devices = self.devices.subscribers(address, conn).await?;
             for device in devices {
                 log::debug!("    Device: {:?}", device);
                 let message = self.localize(&msg, &device.lang);
+                let meta = Self::make_metadata(&event, &device);
                 let prepared_message = PreparedMessage {
                     device,
                     message,
-                    data: Some(meta.clone()),
+                    data: Some(meta),
                     collapse_key: None,
                 };
                 log::debug!("      Message prepared: {:?}", prepared_message);
@@ -160,7 +161,7 @@ impl MessagePump {
         Ok(res)
     }
 
-    fn make_metadata(&self, event: &Event) -> MessageData {
+    fn make_metadata(event: &Event, device: &Device) -> MessageData {
         match event {
             Event::OrderExecuted {
                 execution: OrderExecution::Full,
@@ -169,6 +170,7 @@ impl MessagePump {
             } => MessageData::OrderExecuted {
                 amount_asset_id: asset_pair.amount_asset.id(),
                 price_asset_id: asset_pair.price_asset.id(),
+                address: device.address.as_base58_string(),
             },
 
             Event::OrderExecuted {
@@ -178,11 +180,13 @@ impl MessagePump {
             } => MessageData::OrderPartiallyExecuted {
                 amount_asset_id: asset_pair.amount_asset.id(),
                 price_asset_id: asset_pair.price_asset.id(),
+                address: device.address.as_base58_string(),
             },
 
             Event::PriceChanged { asset_pair, .. } => MessageData::PriceThresholdReached {
                 amount_asset_id: asset_pair.amount_asset.id(),
                 price_asset_id: asset_pair.price_asset.id(),
+                address: device.address.as_base58_string(),
             },
         }
     }
