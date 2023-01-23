@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
-use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl};
+use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl, TextExpressionMethods};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use reqwest::Url;
 
@@ -225,6 +225,7 @@ impl Repo {
                 subscriptions::topic,
             ))
             .filter(subscriptions::subscriber_address.eq(address.as_base58_string()))
+            .filter(subscriptions::topic.like("push://orders%"))
             .order(subscriptions::uid)
             .load::<(i32, String, DateTime<Utc>, i32, String)>(conn)
             .await?;
