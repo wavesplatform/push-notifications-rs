@@ -44,6 +44,7 @@ pub struct Subscription {
     pub topic: Topic,
 }
 
+#[derive(Debug)]
 pub struct SubscriptionRequest {
     pub topic_url: String,
     pub topic: Topic,
@@ -169,22 +170,24 @@ impl Topic {
     }
 
     pub fn as_url_string(&self, mode: SubscriptionMode) -> String {
-        match self {
+        let topic = match self {
             Topic::OrderFulfilled { .. } => "push://orders".to_string(),
             Topic::PriceThreshold {
                 amount_asset,
                 price_asset,
                 price_threshold,
             } => {
-                let mut url = format!(
-                    "push://price_threshold/{amount_asset}/{price_asset}/{price_threshold}"
-                );
-                if let SubscriptionMode::Once = mode {
-                    url += "?oneshot";
-                }
-                url
+                format!("push://price_threshold/{amount_asset}/{price_asset}/{price_threshold}")
             }
-        }
+        };
+
+        let subscription_mode = if let SubscriptionMode::Once = mode {
+            "?oneshot"
+        } else {
+            ""
+        };
+
+        format!("{topic}{subscription_mode}")
     }
 }
 
@@ -300,7 +303,32 @@ impl Repo {
                     .iter()
                     .filter(|subscr| !existing_topics.contains(&subscr.topic_url));
 
-                let rows = filtered_subscriptions
+                // if db contains "topic_name" topic and the request has "topic_name?oneshot",
+                // remove old topic from subscriptions and topics_price_threshold tables and insert the new one
+                let subscriptions_to_update_sub_mode = existing_topics
+                    .iter()
+                    .map(|topic_url| {
+                        let (topic, sub_mode) =
+                            Topic::from_url_string(&topic_url).expect("broken topic url");
+                        (topic_url, topic, sub_mode)
+                    })
+                    .zip(filtered_subscriptions.clone())
+                    .filter(|((_, topic, sub_mode), sub_req)| {
+                        *topic == sub_req.topic && *sub_mode != sub_req.mode
+                    })
+                    .map(|((topic_url, ..), _)| topic_url.as_ref())
+                    .collect::<Vec<&str>>();
+
+                if !subscriptions_to_update_sub_mode.is_empty() {
+                    diesel::delete(
+                        subscriptions::table
+                            .filter(subscriptions::topic.eq_any(subscriptions_to_update_sub_mode)),
+                    )
+                    .execute(conn)
+                    .await?;
+                }
+
+                let subscriptions_rows = filtered_subscriptions
                     .clone()
                     .map(|subscr| {
                         (
@@ -318,7 +346,7 @@ impl Repo {
                     .await?;
 
                 let uids = diesel::insert_into(subscriptions::table)
-                    .values(rows)
+                    .values(subscriptions_rows)
                     .returning(subscriptions::uid)
                     .get_results::<i32>(conn)
                     .await?;
@@ -546,6 +574,14 @@ mod tests {
                     price_asset: Asset::Waves
                 },
                 SubscriptionMode::Once,
+                "push://orders?oneshot"
+            ),
+            (
+                Topic::OrderFulfilled {
+                    amount_asset: Asset::Waves,
+                    price_asset: Asset::Waves
+                },
+                SubscriptionMode::Repeat,
                 "push://orders"
             )
         ];
