@@ -14,6 +14,7 @@ pub struct Config {
     pub exponential_backoff_multiplier: f32,
     pub send_max_attempts: u8,
     pub fcm_api_key: String,
+    pub click_action: String,
     pub dry_run: bool,
 }
 
@@ -35,6 +36,7 @@ impl From<ConfigFlat> for Config {
             exponential_backoff_multiplier: conf.send_exponential_backoff_multiplier,
             send_max_attempts: conf.send_max_attempts,
             fcm_api_key: conf.fcm_api_key,
+            click_action: conf.send_click_action,
             dry_run: conf.send_dry_run,
         }
     }
@@ -51,6 +53,8 @@ struct ConfigFlat {
     #[serde(default = "default_send_max_attempts")]
     send_max_attempts: u8,
     fcm_api_key: String,
+    #[serde(default = "default_send_click_action")]
+    send_click_action: String,
     #[serde(default = "default_send_dry_run")]
     send_dry_run: bool,
 }
@@ -75,16 +79,21 @@ fn default_send_dry_run() -> bool {
     false
 }
 
+fn default_send_click_action() -> String {
+    "open".to_owned()
+}
+
 impl fmt::Debug for Config {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Intentionally avoid printing FCM API Key for security reasons
         write!(
             f,
-            "Sender(empty_queue_poll_period={}s; exponential_backoff_initial_interval={}s; exponential_backoff_multiplier={}; send_max_attempts={}; fcm_api_key=***; dry_run={})",
+            "Sender(empty_queue_poll_period={}s; exponential_backoff_initial_interval={}s; exponential_backoff_multiplier={}; send_max_attempts={}; fcm_api_key=***; click_action={}; dry_run={})",
             self.empty_queue_poll_period.num_seconds(),
             self.exponential_backoff_initial_interval.num_seconds(),
             self.exponential_backoff_multiplier,
             self.send_max_attempts,
+            self.click_action,
             self.dry_run,
         )
     }

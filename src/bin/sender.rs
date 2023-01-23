@@ -24,6 +24,7 @@ async fn main() -> Result<(), Error> {
     let fcm = FcmRemoteGateway {
         client: fcm::Client::new(),
         api_key: config.fcm_api_key,
+        click_action: config.click_action,
         dry_run: config.dry_run,
     };
 
@@ -113,6 +114,7 @@ impl fmt::Debug for MessageToSend {
 struct FcmRemoteGateway {
     client: fcm::Client,
     api_key: String,
+    click_action: String,
     dry_run: bool,
 }
 
@@ -131,6 +133,7 @@ impl FcmRemoteGateway {
             let mut builder = fcm::NotificationBuilder::new();
             builder.title(&message.notification_title);
             builder.body(&message.notification_body);
+            builder.click_action(&self.click_action);
             builder.finalize()
         };
 
