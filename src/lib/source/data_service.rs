@@ -28,9 +28,23 @@ pub(super) async fn load_pairs(
     let client = HttpClient::<DataService>::from_base_url(data_service_url);
     let pairs = client.pairs().await?;
     let pairs = pairs.items;
+    let unique_assets = pairs
+        .iter()
+        .map(|p| vec![&p.amount_asset, &p.price_asset])
+        .flatten()
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .map(|asset| Asset::from_id(asset).expect("asset"))
+        .collect::<Vec<_>>();
+    log::debug!(
+        "Loading {} unique assets from {} pairs",
+        unique_assets.len(),
+        pairs.len()
+    );
+    assets.preload(unique_assets).await?;
     let mut res = Vec::with_capacity(pairs.len());
     for pair in &pairs {
-        log::debug!("Loading pair {} / {}", pair.amount_asset, pair.price_asset);
+        log::trace!("Loading pair {} / {}", pair.amount_asset, pair.price_asset);
         let pair = convert_pair(pair, assets).await?;
         res.push(pair);
     }

@@ -3,7 +3,7 @@ use wavesexchange_apis::{
     assets::dto::{AssetInfo, OutputFormat},
     AssetsService, HttpClient,
 };
-use wavesexchange_loaders::{CachedLoader, Loader as _, TimedCache, UnboundCache};
+use wavesexchange_loaders::{CachedLoader, Loader as _, TimedCache};
 
 type Ticker = String;
 type Decimals = u8;
@@ -20,9 +20,15 @@ pub struct RemoteGateway {
 }
 
 impl RemoteGateway {
-    pub fn new(assets_url: impl AsRef<str>) -> Self {
-        let assets_client = HttpClient::<AssetsService>::from_base_url(assets_url.as_ref());
+    pub fn new(asset_service_url: impl AsRef<str>) -> Self {
+        let url = asset_service_url.as_ref();
+        let assets_client = HttpClient::<AssetsService>::from_base_url(url);
         RemoteGateway { assets_client }
+    }
+
+    pub async fn preload(&self, assets: Vec<Asset>) -> Result<(), Error> {
+        let _ = self.load_many(assets).await?;
+        Ok(())
     }
 
     pub async fn ticker(&self, asset: &Asset) -> Result<Option<Ticker>, Error> {
@@ -30,31 +36,11 @@ impl RemoteGateway {
     }
 
     pub async fn decimals(&self, asset: &Asset) -> Result<Decimals, Error> {
-        self.load(asset.to_owned()).await.map_err(Error::from)
+        self.asset_info(asset).await.map(|a| a.decimals)
     }
 
     async fn asset_info(&self, asset: &Asset) -> Result<LocalAssetInfo, Error> {
         self.load(asset.to_owned()).await.map_err(Error::from)
-    }
-}
-
-#[async_trait]
-impl CachedLoader<Asset, Decimals> for RemoteGateway {
-    type Cache = UnboundCache<Asset, Decimals>;
-
-    type Error = Error;
-
-    async fn load_fn(&mut self, keys: &[Asset]) -> Result<Vec<Decimals>, Self::Error> {
-        let mut result = vec![];
-        for asset in keys {
-            let asset = self.asset_info(asset).await?;
-            result.push(asset.decimals)
-        }
-        Ok(result)
-    }
-
-    fn init_cache() -> Self::Cache {
-        UnboundCache::new()
     }
 }
 
@@ -82,7 +68,7 @@ impl CachedLoader<Asset, LocalAssetInfo> for RemoteGateway {
                     decimals: a.precision as u8,
                 },
                 Some(AssetInfo::Brief(_)) => {
-                    unreachable!("Full info expected")
+                    unreachable!("Broken API: Full info expected for asset {}", asset_id);
                 }
                 None => {
                     panic!("No AssetInfo for asset {}", asset_id);
@@ -92,6 +78,7 @@ impl CachedLoader<Asset, LocalAssetInfo> for RemoteGateway {
     }
 
     fn init_cache() -> Self::Cache {
+        //TODO Ugly API requiring raw seconds instead of a Duration. Find ways to refactor.
         TimedCache::with_lifespan(60 * 60 * 24)
     }
 }
