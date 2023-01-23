@@ -277,9 +277,15 @@ mod redis_stream {
         let mut fetching_backlog = true;
         let mut from_id = BEGIN_OF_STREAM.to_string();
 
+        // Without this timeout Redis would not block at all
+        // if there are no new messages in the stream,
+        // returning empty reply instead, making our loop too busy.
+        const MAX_BLOCK_TIME: Duration = Duration::from_secs(6);
+
         let read_options = StreamReadOptions::default()
             .group(&group_name, &consumer_name)
-            .count(batch_max_size as usize);
+            .count(batch_max_size as usize)
+            .block(MAX_BLOCK_TIME.as_millis() as usize);
 
         loop {
             log::trace!(
@@ -288,9 +294,15 @@ mod redis_stream {
                 from_id,
             );
 
-            let reply: StreamReadReply = con
-                .xread_options(&[&stream_name], &[&from_id], &read_options)
-                .await?;
+            let reply = loop {
+                let reply: StreamReadReply = con
+                    .xread_options(&[&stream_name], &[&from_id], &read_options)
+                    .await?;
+
+                if !reply.keys.is_empty() {
+                    break reply;
+                }
+            };
 
             // We expect exactly 1 key in the reply, as requested
             let ids = {
