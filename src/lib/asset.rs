@@ -6,12 +6,10 @@ use wavesexchange_apis::{
 use wavesexchange_loaders::{CachedLoader, Loader as _, TimedCache};
 
 type Ticker = String;
-type Decimals = u8;
 
 #[derive(Debug, Clone)]
 struct LocalAssetInfo {
     ticker: Option<Ticker>,
-    decimals: Decimals,
 }
 
 #[derive(Clone)]
@@ -33,10 +31,6 @@ impl RemoteGateway {
 
     pub async fn ticker(&self, asset: &Asset) -> Result<Option<Ticker>, Error> {
         self.asset_info(asset).await.map(|a| a.ticker)
-    }
-
-    pub async fn decimals(&self, asset: &Asset) -> Result<Decimals, Error> {
-        self.asset_info(asset).await.map(|a| a.decimals)
     }
 
     async fn asset_info(&self, asset: &Asset) -> Result<LocalAssetInfo, Error> {
@@ -63,10 +57,7 @@ impl CachedLoader<Asset, LocalAssetInfo> for RemoteGateway {
             .into_iter()
             .zip(keys)
             .map(|(asset, asset_id)| match asset.data {
-                Some(AssetInfo::Full(a)) => LocalAssetInfo {
-                    ticker: a.ticker,
-                    decimals: a.precision as u8,
-                },
+                Some(AssetInfo::Full(a)) => LocalAssetInfo { ticker: a.ticker },
                 Some(AssetInfo::Brief(_)) => {
                     unreachable!("Broken API: Full info expected for asset {}", asset_id);
                 }
