@@ -36,9 +36,9 @@ CREATE TABLE IF NOT EXISTS topics_price_threshold (
     price_asset_id varchar not null,
     price_threshold double precision not null,
 
-    UNIQUE (amount_asset_id, price_asset_id, price_threshold),
     foreign key (subscription_uid) references subscriptions(uid) ON DELETE CASCADE
 );
+CREATE INDEX ON topics_price_threshold(amount_asset_id, price_asset_id, price_threshold);
 
 CREATE TABLE IF NOT EXISTS messages (
     uid serial not null primary key,
