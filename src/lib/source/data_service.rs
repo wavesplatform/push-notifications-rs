@@ -3,7 +3,7 @@
 use crate::{
     asset,
     model::{Address, AsBase58String, Asset, AssetPair},
-    stream::PriceWithDecimals,
+    stream::Price,
 };
 use anyhow::ensure;
 use wavesexchange_apis::{
@@ -17,7 +17,7 @@ use wavesexchange_apis::{
 
 pub(super) struct Pair {
     pub pair: AssetPair,
-    pub last_price: PriceWithDecimals,
+    pub last_price: Price,
 }
 
 pub(super) async fn load_pairs(
@@ -28,6 +28,7 @@ pub(super) async fn load_pairs(
     let client = HttpClient::<DataService>::from_base_url(data_service_url);
     let pairs = client.pairs().await?;
     let pairs = pairs.items;
+    //todo move unique assets somewhere else
     let unique_assets = pairs
         .iter()
         .map(|p| vec![&p.amount_asset, &p.price_asset])
@@ -45,35 +46,22 @@ pub(super) async fn load_pairs(
     let mut res = Vec::with_capacity(pairs.len());
     for pair in &pairs {
         log::trace!("Loading pair {} / {}", pair.amount_asset, pair.price_asset);
-        let pair = convert_pair(pair, assets).await?;
+        let pair = convert_pair(pair).await?;
         res.push(pair);
     }
     Ok(res)
 }
 
-async fn convert_pair(pair: &dto::Pair, assets: &asset::RemoteGateway) -> anyhow::Result<Pair> {
+async fn convert_pair(pair: &dto::Pair) -> anyhow::Result<Pair> {
     let amount_asset = Asset::from_id(&pair.amount_asset).expect("amt asset");
     let price_asset = Asset::from_id(&pair.price_asset).expect("price asset");
-    let last_price_raw = pair.data.last_price.to_u64().expect("price fits u64");
-    let price_decimals = {
-        let amount_asset_decimals = assets.decimals(&amount_asset).await? as i16;
-        let price_asset_decimals = assets.decimals(&price_asset).await? as i16;
-        let decimals = 8 + price_asset_decimals - amount_asset_decimals;
-        ensure!(
-            decimals >= 0 && decimals <= 255,
-            "Unexpected price_decimals: {decimals} for asset pair {amount_asset}/{price_asset} ({amount_asset_decimals}/{price_asset_decimals})"
-        );
-        decimals as u8 // Cast is safe due to the check above
-    };
+    let last_price = pair.data.last_price.to_f64().expect("price fits f64");
     let pair = Pair {
         pair: AssetPair {
             amount_asset,
             price_asset,
         },
-        last_price: PriceWithDecimals {
-            price: last_price_raw,
-            decimals: price_decimals,
-        },
+        last_price,
     };
     Ok(pair)
 }

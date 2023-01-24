@@ -123,10 +123,7 @@ impl Source {
         Self::send_price_events(block_prices, timestamp, sink).await
     }
 
-    fn aggregate_prices_from_block(
-        &mut self,
-        block: AppendBlock,
-    ) -> Vec<(AssetPair, PriceRange)> {
+    fn aggregate_prices_from_block(&mut self, block: AppendBlock) -> Vec<(AssetPair, PriceRange)> {
         self.aggregators
             .values_mut()
             .for_each(PriceAggregator::reset);
@@ -139,8 +136,9 @@ impl Source {
                 };
                 let new_price = PriceWithDecimals {
                     price: tx.exchange_tx.price,
-                    decimals: 8, // This is a hard-coded value
+                    decimals: 8, // This is a fixed value, same for all assets
                 };
+                let new_price = new_price.value();
                 let aggregator = self
                     .aggregators
                     .entry(asset_pair)
@@ -192,17 +190,17 @@ enum Error {
 }
 
 mod aggregator {
-    use crate::stream::{PriceRange, PriceWithDecimals};
+    use crate::stream::{Price, PriceRange};
     use std::mem::take;
 
     pub(super) struct PriceAggregator {
-        prev_block_price: PriceWithDecimals,
-        latest_price: PriceWithDecimals,
+        prev_block_price: Price,
+        latest_price: Price,
         current_range: PriceRange,
     }
 
     impl PriceAggregator {
-        pub(super) fn new(last_known_price: PriceWithDecimals) -> Self {
+        pub(super) fn new(last_known_price: Price) -> Self {
             PriceAggregator {
                 prev_block_price: last_known_price,
                 latest_price: last_known_price,
@@ -214,17 +212,17 @@ mod aggregator {
             self.current_range = PriceRange::empty();
         }
 
-        pub(super) fn update(&mut self, new_price: PriceWithDecimals) {
+        pub(super) fn update(&mut self, new_price: Price) {
             let current_range = &mut self.current_range;
-            *current_range = take(current_range).extend(new_price.value());
+            *current_range = take(current_range).extend(new_price);
             self.latest_price = new_price;
         }
 
         pub(super) fn finalize(&mut self) {
             let current_range = &mut self.current_range;
             *current_range = take(current_range)
-                .extend(self.prev_block_price.value())
-                .exclude_bound(self.prev_block_price.value());
+                .extend(self.prev_block_price)
+                .exclude_bound(self.prev_block_price);
             self.prev_block_price = self.latest_price;
         }
 
@@ -235,23 +233,22 @@ mod aggregator {
 
     #[test]
     fn test_aggregator() {
-        let p = |price, decimals| PriceWithDecimals { price, decimals };
-        let mut agg = PriceAggregator::new(p(0, 0));
+        let mut agg = PriceAggregator::new(0.0);
 
         let threshold = 5.0;
 
         // Block 1: range = [4..5], hit threshold 5, close_price = 5
-        agg.update(p(400, 2));
-        agg.update(p(450, 2));
-        agg.update(p(500, 2));
+        agg.update(4.0);
+        agg.update(4.5);
+        agg.update(5.0);
         agg.finalize();
         let range = agg.range();
         assert_eq!(range.contains(threshold), true);
 
         // Block 2: range = (5..6], threshold 5 not hit again
         agg.reset();
-        agg.update(p(550, 2));
-        agg.update(p(600, 2));
+        agg.update(5.5);
+        agg.update(6.0);
         agg.finalize();
         let range = agg.range();
         assert_eq!(range.contains(threshold), false);
