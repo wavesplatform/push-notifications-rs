@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
 use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl};
-use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use reqwest::Url;
 
 use crate::{
@@ -11,8 +11,6 @@ use crate::{
     schema::{subscribers, subscriptions, topics_price_threshold},
     stream::{Event, Price, PriceRange},
 };
-
-use crate::scoped_futures::ScopedFutureExt;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum TopicError {
@@ -289,102 +287,96 @@ impl Repo {
         subscriptions: Vec<SubscriptionRequest>,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
-        conn.transaction(move |conn| {
-            async move {
-                let existing_topics: HashSet<String> = HashSet::from_iter(
-                    subscriptions::table
-                        .select(subscriptions::topic)
-                        .filter(subscriptions::subscriber_address.eq(address.as_base58_string()))
-                        .get_results::<String>(conn)
-                        .await?,
-                );
+        let existing_topics: HashSet<String> = HashSet::from_iter(
+            subscriptions::table
+                .select(subscriptions::topic)
+                .filter(subscriptions::subscriber_address.eq(address.as_base58_string()))
+                .get_results::<String>(conn)
+                .await?,
+        );
 
-                let filtered_subscriptions = subscriptions
-                    .iter()
-                    .filter(|subscr| !existing_topics.contains(&subscr.topic_url));
+        let filtered_subscriptions = subscriptions
+            .iter()
+            .filter(|subscr| !existing_topics.contains(&subscr.topic_url));
 
-                // if db contains "topic_name" topic and the request has "topic_name?oneshot",
-                // remove old topic from subscriptions and topics_price_threshold tables and insert the new one
-                let subscriptions_to_update_sub_mode = existing_topics
-                    .iter()
-                    .map(|topic_url| {
-                        let (topic, sub_mode) =
-                            Topic::from_url_string(&topic_url).expect("broken topic url");
-                        (topic_url, topic, sub_mode)
-                    })
-                    .zip(filtered_subscriptions.clone())
-                    .filter(|((_, topic, sub_mode), sub_req)| {
-                        *topic == sub_req.topic && *sub_mode != sub_req.mode
-                    })
-                    .map(|((topic_url, ..), _)| topic_url.as_ref())
-                    .collect::<Vec<&str>>();
+        // if db contains "topic_name" topic and the request has "topic_name?oneshot",
+        // remove old topic from subscriptions and topics_price_threshold tables and insert the new one
+        let subscriptions_to_update_sub_mode = existing_topics
+            .iter()
+            .map(|topic_url| {
+                let (topic, sub_mode) =
+                    Topic::from_url_string(&topic_url).expect("broken topic url");
+                (topic_url, topic, sub_mode)
+            })
+            .zip(filtered_subscriptions.clone())
+            .filter(|((_, topic, sub_mode), sub_req)| {
+                *topic == sub_req.topic && *sub_mode != sub_req.mode
+            })
+            .map(|((topic_url, ..), _)| topic_url.as_ref())
+            .collect::<Vec<&str>>();
 
-                if !subscriptions_to_update_sub_mode.is_empty() {
-                    diesel::delete(
-                        subscriptions::table
-                            .filter(subscriptions::topic.eq_any(subscriptions_to_update_sub_mode)),
+        if !subscriptions_to_update_sub_mode.is_empty() {
+            diesel::delete(
+                subscriptions::table
+                    .filter(subscriptions::topic.eq_any(subscriptions_to_update_sub_mode)),
+            )
+            .execute(conn)
+            .await?;
+        }
+
+        let subscriptions_rows = filtered_subscriptions
+            .clone()
+            .map(|subscr| {
+                (
+                    subscriptions::subscriber_address.eq(address.as_base58_string()),
+                    subscriptions::topic.eq(subscr.topic_url.clone()),
+                    subscriptions::topic_type.eq(subscr.mode.to_int() as i32),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        diesel::insert_into(subscribers::table)
+            .values(subscribers::address.eq(address.as_base58_string()))
+            .on_conflict_do_nothing()
+            .execute(conn)
+            .await?;
+
+        let uids = diesel::insert_into(subscriptions::table)
+            .values(subscriptions_rows)
+            .returning(subscriptions::uid)
+            .get_results::<i32>(conn)
+            .await?;
+
+        let subscr_with_uids = filtered_subscriptions.zip(uids.into_iter());
+
+        let new_price_threshold_topics = subscr_with_uids
+            .filter(|&(subscr, _uid)| matches!(subscr.topic, Topic::PriceThreshold { .. }))
+            .map(|(subscr, uid)| {
+                if let Topic::PriceThreshold {
+                    amount_asset,
+                    price_asset,
+                    price_threshold,
+                } = &subscr.topic
+                {
+                    (
+                        topics_price_threshold::subscription_uid.eq(uid),
+                        topics_price_threshold::amount_asset_id.eq(amount_asset.id()),
+                        topics_price_threshold::price_asset_id.eq(price_asset.id()),
+                        topics_price_threshold::price_threshold.eq(price_threshold),
                     )
-                    .execute(conn)
-                    .await?;
+                } else {
+                    unreachable!("broken filter by topic type")
                 }
+            })
+            .collect::<Vec<_>>();
 
-                let subscriptions_rows = filtered_subscriptions
-                    .clone()
-                    .map(|subscr| {
-                        (
-                            subscriptions::subscriber_address.eq(address.as_base58_string()),
-                            subscriptions::topic.eq(subscr.topic_url.clone()),
-                            subscriptions::topic_type.eq(subscr.mode.to_int() as i32),
-                        )
-                    })
-                    .collect::<Vec<_>>();
-
-                diesel::insert_into(subscribers::table)
-                    .values(subscribers::address.eq(address.as_base58_string()))
-                    .on_conflict_do_nothing()
-                    .execute(conn)
-                    .await?;
-
-                let uids = diesel::insert_into(subscriptions::table)
-                    .values(subscriptions_rows)
-                    .returning(subscriptions::uid)
-                    .get_results::<i32>(conn)
-                    .await?;
-
-                let subscr_with_uids = filtered_subscriptions.zip(uids.into_iter());
-
-                let new_price_threshold_topics = subscr_with_uids
-                    .filter(|&(subscr, _uid)| matches!(subscr.topic, Topic::PriceThreshold { .. }))
-                    .map(|(subscr, uid)| {
-                        if let Topic::PriceThreshold {
-                            amount_asset,
-                            price_asset,
-                            price_threshold,
-                        } = &subscr.topic
-                        {
-                            (
-                                topics_price_threshold::subscription_uid.eq(uid),
-                                topics_price_threshold::amount_asset_id.eq(amount_asset.id()),
-                                topics_price_threshold::price_asset_id.eq(price_asset.id()),
-                                topics_price_threshold::price_threshold.eq(price_threshold),
-                            )
-                        } else {
-                            unreachable!("broken filter by topic type")
-                        }
-                    })
-                    .collect::<Vec<_>>();
-
-                if new_price_threshold_topics.len() > 0 {
-                    diesel::insert_into(topics_price_threshold::table)
-                        .values(new_price_threshold_topics)
-                        .execute(conn)
-                        .await?;
-                }
-                Ok(())
-            }
-            .scope_boxed()
-        })
-        .await
+        if new_price_threshold_topics.len() > 0 {
+            diesel::insert_into(topics_price_threshold::table)
+                .values(new_price_threshold_topics)
+                .execute(conn)
+                .await?;
+        }
+        Ok(())
     }
 
     pub async fn unsubscribe(
@@ -393,45 +385,38 @@ impl Repo {
         topics: Option<Vec<String>>,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
-        conn.transaction(move |conn| {
-            let address = address.as_base58_string();
-            async move {
-                let uids_to_remove: Vec<i32> = match topics {
-                    Some(topics) => {
-                        subscriptions::table
-                            .select(subscriptions::uid)
-                            .filter(subscriptions::subscriber_address.eq(address))
-                            .filter(subscriptions::topic.eq_any(topics))
-                            .get_results(conn)
-                            .await?
-                    }
-                    None => {
-                        subscriptions::table
-                            .select(subscriptions::uid)
-                            .filter(subscriptions::subscriber_address.eq(address))
-                            .get_results(conn)
-                            .await?
-                    }
-                };
+        let address = address.as_base58_string();
 
-                diesel::delete(
-                    topics_price_threshold::table
-                        .filter(topics_price_threshold::subscription_uid.eq_any(&uids_to_remove)),
-                )
-                .execute(conn)
-                .await?;
-
-                diesel::delete(
-                    subscriptions::table.filter(subscriptions::uid.eq_any(uids_to_remove)),
-                )
-                .execute(conn)
-                .await?;
-
-                Ok(())
+        let uids_to_remove: Vec<i32> = match topics {
+            Some(topics) => {
+                subscriptions::table
+                    .select(subscriptions::uid)
+                    .filter(subscriptions::subscriber_address.eq(address))
+                    .filter(subscriptions::topic.eq_any(topics))
+                    .get_results(conn)
+                    .await?
             }
-            .scope_boxed()
-        })
-        .await
+            None => {
+                subscriptions::table
+                    .select(subscriptions::uid)
+                    .filter(subscriptions::subscriber_address.eq(address))
+                    .get_results(conn)
+                    .await?
+            }
+        };
+
+        diesel::delete(
+            topics_price_threshold::table
+                .filter(topics_price_threshold::subscription_uid.eq_any(&uids_to_remove)),
+        )
+        .execute(conn)
+        .await?;
+
+        diesel::delete(subscriptions::table.filter(subscriptions::uid.eq_any(uids_to_remove)))
+            .execute(conn)
+            .await?;
+
+        Ok(())
     }
 
     pub async fn get_topics_by_address(

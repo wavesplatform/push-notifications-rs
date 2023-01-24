@@ -129,7 +129,10 @@ mod controllers {
         subscription::{self, SubscriptionRequest, Topic},
         Error,
     };
+    use diesel_async::AsyncConnection;
     use warp::{http::StatusCode, reply::Json, Rejection};
+
+    use crate::scoped_futures::ScopedFutureExt as _;
 
     pub async fn unregister_device(
         fcm_uid: FcmUid,
@@ -137,9 +140,18 @@ mod controllers {
         devices: device::Repo,
         pool: Pool,
     ) -> Result<StatusCode, Rejection> {
-        let mut conn = pool.get().await.map_err(Error::from)?;
+        pool.get()
+            .await
+            .map_err(Error::from)?
+            .transaction(|conn| {
+                async move {
+                    // All work only within db transaction
+                    devices.unregister(&address, &fcm_uid, conn).await
+                }
+                .scope_boxed()
+            })
+            .await?;
 
-        devices.unregister(&address, &fcm_uid, &mut conn).await?;
         Ok(StatusCode::NO_CONTENT)
     }
 
@@ -150,23 +162,32 @@ mod controllers {
         pool: Pool,
         device_info: dto::NewDevice,
     ) -> Result<StatusCode, Rejection> {
-        let mut conn = pool.get().await.map_err(Error::from)?;
+        pool.get()
+            .await
+            .map_err(Error::from)?
+            .transaction(|conn| {
+                async move {
+                    // All work only within db transaction
+                    if devices.exists(&address, &fcm_uid, conn).await? {
+                        return Ok::<StatusCode, Error>(StatusCode::NO_CONTENT);
+                    }
 
-        if devices.exists(&address, &fcm_uid, &mut conn).await? {
-            return Ok(StatusCode::NO_CONTENT);
-        }
+                    devices
+                        .register(
+                            &address,
+                            &fcm_uid,
+                            &device_info.lang.language,
+                            device_info.tz.utc_offset_seconds,
+                            conn,
+                        )
+                        .await?;
 
-        devices
-            .register(
-                &address,
-                &fcm_uid,
-                &device_info.lang.language,
-                device_info.tz.utc_offset_seconds,
-                &mut conn,
-            )
-            .await?;
-
-        Ok(StatusCode::CREATED)
+                    Ok(StatusCode::CREATED)
+                }
+                .scope_boxed()
+            })
+            .await
+            .map_err(Into::into)
     }
 
     pub async fn update_device(
@@ -176,25 +197,34 @@ mod controllers {
         pool: Pool,
         device_info: dto::UpdateDevice,
     ) -> Result<StatusCode, Rejection> {
-        let response = if device_info.fcm.is_some() {
+        let has_fcm = device_info.fcm.is_some();
+
+        pool.get()
+            .await
+            .map_err(Error::from)?
+            .transaction(|conn| {
+                async move {
+                    // All work only within db transaction
+                    devices
+                        .update(
+                            &address,
+                            &fcm_uid,
+                            device_info.lang.map(|l| l.language),
+                            device_info.tz.map(|tz| tz.utc_offset_seconds),
+                            device_info.fcm.map(|fcm| fcm.fcm_uid),
+                            conn,
+                        )
+                        .await
+                }
+                .scope_boxed()
+            })
+            .await?;
+
+        let response = if has_fcm {
             StatusCode::OK
         } else {
             StatusCode::NO_CONTENT
         };
-
-        let mut conn = pool.get().await.map_err(Error::from)?;
-
-        devices
-            .update(
-                &address,
-                &fcm_uid,
-                device_info.lang.map(|l| l.language),
-                device_info.tz.map(|tz| tz.utc_offset_seconds),
-                device_info.fcm.map(|fcm| fcm.fcm_uid),
-                &mut conn,
-            )
-            .await?;
-
         Ok(response)
     }
 
@@ -204,10 +234,18 @@ mod controllers {
         pool: Pool,
         topics: Option<dto::Topics>,
     ) -> Result<StatusCode, Rejection> {
-        let mut conn = pool.get().await.map_err(Error::from)?;
-
-        subscriptions
-            .unsubscribe(&address, topics.map(|t| t.topics), &mut conn)
+        pool.get()
+            .await
+            .map_err(Error::from)?
+            .transaction(|conn| {
+                async move {
+                    // All work only within db transaction
+                    subscriptions
+                        .unsubscribe(&address, topics.map(|t| t.topics), conn)
+                        .await
+                }
+                .scope_boxed()
+            })
             .await?;
 
         Ok(StatusCode::NO_CONTENT)
@@ -233,9 +271,17 @@ mod controllers {
             })
             .collect::<Result<Vec<SubscriptionRequest>, Error>>()?;
 
-        let mut conn = pool.get().await.map_err(Error::from)?;
-
-        subscriptions.subscribe(&address, subs, &mut conn).await?;
+        pool.get()
+            .await
+            .map_err(Error::from)?
+            .transaction(|conn| {
+                async move {
+                    // All work only within db transaction
+                    subscriptions.subscribe(&address, subs, conn).await
+                }
+                .scope_boxed()
+            })
+            .await?;
 
         Ok(StatusCode::NO_CONTENT)
     }
@@ -245,10 +291,17 @@ mod controllers {
         subscriptions: subscription::Repo,
         pool: Pool,
     ) -> Result<Json, Rejection> {
-        let mut conn = pool.get().await.map_err(Error::from)?;
-
-        let topics = subscriptions
-            .get_topics_by_address(&address, &mut conn)
+        let topics = pool
+            .get()
+            .await
+            .map_err(Error::from)?
+            .transaction(|conn| {
+                async move {
+                    // All work only within db transaction
+                    subscriptions.get_topics_by_address(&address, conn).await
+                }
+                .scope_boxed()
+            })
             .await?;
 
         Ok(warp::reply::json(&dto::Topics { topics }))
