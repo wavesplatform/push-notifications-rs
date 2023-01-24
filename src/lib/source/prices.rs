@@ -1,6 +1,6 @@
 //! Source of Price events
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use tokio::{
     sync::{mpsc, oneshot},
@@ -43,6 +43,8 @@ impl SourceFactory<'_> {
         let (client, starting_height) = try_join!(client, starting_height)?;
         let updates_stream = client.stream(starting_height);
         let (initial_prices, updates_stream) = try_join!(initial_prices, updates_stream)?;
+        self.preload_assets_from_pairs(initial_prices.keys())
+            .await?;
         let res = Source {
             stream: updates_stream,
             matcher_address: self.matcher_address.to_owned(),
@@ -53,13 +55,35 @@ impl SourceFactory<'_> {
 
     async fn load_initial_prices(&self) -> anyhow::Result<HashMap<AssetPair, PriceAggregator>> {
         log::info!("Loading pairs from data-service");
-        let pairs = data_service::load_pairs(self.data_service_url, self.assets).await?;
+        let pairs = data_service::load_pairs(self.data_service_url).await?;
         let mut res = HashMap::with_capacity(pairs.len());
         for pair in pairs {
             let aggregator = PriceAggregator::new(pair.last_price);
             res.insert(pair.pair, aggregator);
         }
+        log::info!("Loaded {} pairs", res.len());
         Ok(res)
+    }
+
+    async fn preload_assets_from_pairs<'a>(
+        &self,
+        pairs: impl Iterator<Item = &'a AssetPair>,
+    ) -> anyhow::Result<()> {
+        let unique_assets = pairs
+            .map(|p| vec![&p.amount_asset, &p.price_asset])
+            .flatten()
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        log::info!(
+            "Preloading {} unique assets using Asset Service",
+            unique_assets.len()
+        );
+
+        self.assets.preload(unique_assets).await?;
+        Ok(())
     }
 
     async fn load_starting_height(&self) -> anyhow::Result<u32> {
