@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{
+    device::LocaleInfo,
     error::Error,
     message::{LocalizedMessage, Message},
-    model::{Lang, Timestamp},
+    model::Timestamp,
     stream::{OrderExecution, OrderSide},
 };
 
@@ -40,8 +41,8 @@ impl Repo {
         Ok(Self { translations })
     }
 
-    pub fn localize(&self, message: &Message, lang: &Lang) -> Option<LocalizedMessage> {
-        let translate = |key| self.translations.translate(key, lang);
+    pub fn localize(&self, message: &Message, locale: &LocaleInfo) -> Option<LocalizedMessage> {
+        let translate = |key| self.translations.translate(key, &locale.lang);
 
         let title_key = match message {
             Message::OrderExecuted { .. } => lokalise_keys::ORDER_FILLED_TITLE,
@@ -91,7 +92,9 @@ impl Repo {
 
         let (date, time) = match message {
             Message::OrderExecuted { timestamp, .. }
-            | Message::PriceThresholdReached { timestamp, .. } => format_date_time(*timestamp),
+            | Message::PriceThresholdReached { timestamp, .. } => {
+                format_date_time(*timestamp, locale)
+            }
         };
 
         let title = translate(title_key)?;
@@ -115,10 +118,10 @@ impl Repo {
     }
 }
 
-fn format_date_time(timestamp: Timestamp) -> (String, String) {
-    if let Some(dt) = timestamp.date_time() {
+fn format_date_time(timestamp: Timestamp, locale: &LocaleInfo) -> (String, String) {
+    if let Some(dt) = timestamp.date_time(locale.utc_offset_seconds) {
         let dt = dt.naive_utc();
-        //TODO Probably we gonna need the localized format of date and time
+        //TODO Probably we gonna need the localized format of date and time (using `locale.lang` maybe)
         let date = dt.date().format("%Y-%m-%d").to_string();
         let time = dt.time().format("%H:%M:%S").to_string();
         (date, time)

@@ -16,7 +16,13 @@ pub struct Device {
     pub device_uid: i32,
     pub address: Address,
     pub fcm_uid: FcmUid,
+    pub locale: LocaleInfo,
+}
+
+#[derive(Debug)]
+pub struct LocaleInfo {
     pub lang: Lang,
+    pub utc_offset_seconds: i32,
 }
 
 #[derive(Clone)]
@@ -29,19 +35,27 @@ impl Repo {
         conn: &mut AsyncPgConnection,
     ) -> Result<Vec<Device>, Error> {
         let rows = devices::table
-            .select((devices::uid, devices::fcm_uid, devices::language))
+            .select((
+                devices::uid,
+                devices::fcm_uid,
+                devices::language,
+                devices::utc_offset_seconds,
+            ))
             .filter(devices::subscriber_address.eq(address.as_base58_string()))
             .order(devices::uid)
-            .load::<(i32, String, String)>(conn)
+            .load::<(i32, String, String, i32)>(conn)
             .await?;
 
         let devices = rows
             .into_iter()
-            .map(|(device_uid, fcm_uid, lang)| Device {
+            .map(|(device_uid, fcm_uid, lang, utc_offset_seconds)| Device {
                 device_uid,
                 fcm_uid,
                 address: address.clone(),
-                lang,
+                locale: LocaleInfo {
+                    lang,
+                    utc_offset_seconds,
+                },
             })
             .collect();
 

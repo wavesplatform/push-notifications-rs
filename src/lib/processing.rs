@@ -1,10 +1,10 @@
 use crate::{
     asset,
-    device::{self, Device},
+    device::{self, Device, LocaleInfo},
     error::Error,
     localization,
     message::{self, LocalizedMessage, Message, MessageData, PreparedMessage},
-    model::{AsBase58String, Asset, Lang},
+    model::{AsBase58String, Asset},
     stream::{Event, OrderExecution},
     subscription::{self, SubscriptionMode, Topic},
 };
@@ -82,7 +82,7 @@ impl MessagePump {
             let devices = self.devices.subscribers(address, conn).await?;
             for device in devices {
                 log::debug!("    Device: {:?}", device);
-                let message = self.localize(&msg, &device.lang);
+                let message = self.localize(&msg, &device.locale);
                 let meta = Self::make_metadata(&event, &device);
                 let prepared_message = PreparedMessage {
                     device,
@@ -197,15 +197,18 @@ impl MessagePump {
         Ok(ticker)
     }
 
-    fn localize(&self, message: &Message, lang: &Lang) -> LocalizedMessage {
+    fn localize(&self, message: &Message, locale: &LocaleInfo) -> LocalizedMessage {
         const FALLBACK_LANG: &str = "en-US";
-        let maybe_message = self.localizer.localize(message, lang);
+        let maybe_message = self.localizer.localize(message, locale);
         if let Some(message) = maybe_message {
             message
         } else {
-            let fallback_lang = FALLBACK_LANG.to_string();
+            let fallback_locale = LocaleInfo {
+                lang: FALLBACK_LANG.to_string(),
+                utc_offset_seconds: locale.utc_offset_seconds,
+            };
             self.localizer
-                .localize(message, &fallback_lang)
+                .localize(message, &fallback_locale)
                 .expect("fallback translation")
         }
     }
