@@ -107,7 +107,7 @@ impl Timestamp {
     pub fn date_time(&self, utc_offset_seconds: i32) -> Option<DateTimeTz> {
         use chrono::{FixedOffset, TimeZone};
         let unix_timestamp = self.unix_timestamp_millis();
-        let tz = FixedOffset::west_opt(utc_offset_seconds)?;
+        let tz = FixedOffset::east_opt(utc_offset_seconds)?;
         tz.timestamp_millis_opt(unix_timestamp).earliest()
     }
 }
