@@ -2084,6 +2084,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_qs"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c679fa27b429f2bb57fd4710257e643e86c966e716037259f8baa33de594a1b6"
+dependencies = [
+ "percent-encoding",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2994,8 +3005,8 @@ dependencies = [
 
 [[package]]
 name = "wavesexchange_apis"
-version = "0.1.22"
-source = "git+https://github.com/waves-exchange/wavesexchange-rs?tag=wavesexchange_apis/0.1.22#33c030e3d6c557fa8d7367aefdd21d22e46e4a58"
+version = "0.1.23"
+source = "git+https://github.com/waves-exchange/wavesexchange-rs?tag=wavesexchange_apis/0.1.23#968591472bd9c2579323dd1a1a940dff0cf3c4ce"
 dependencies = [
  "async-recursion",
  "base64 0.21.0",
@@ -3009,7 +3020,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serde_qs",
+ "serde_qs 0.11.0",
  "thiserror",
  "tokio",
  "waves-protobuf-schemas",
@@ -3055,7 +3066,7 @@ dependencies = [
  "prometheus",
  "serde",
  "serde_json",
- "serde_qs",
+ "serde_qs 0.10.1",
  "warp",
  "wavesexchange_log",
 ]

@@ -56,6 +56,7 @@ pub(super) async fn load_current_blockchain_height(
     let matcher_address = matcher_address.as_base58_string();
     let mut res = client
         .transactions_exchange(
+            None::<&str>,
             Some(matcher_address),
             None::<&str>,
             None::<&str>,
