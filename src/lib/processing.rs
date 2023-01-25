@@ -12,7 +12,7 @@ use diesel_async::{AsyncConnection, AsyncPgConnection};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::scoped_futures::ScopedFutureExt;
+use crate::scoped_futures::ScopedFutureExt as _;
 
 pub struct EventWithFeedback {
     pub event: Event,

@@ -1,13 +1,11 @@
 use diesel::{result::Error as DslError, AsChangeset, ExpressionMethods, QueryDsl};
-use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use crate::{
     model::{Address, AsBase58String, Lang},
     schema::{devices, subscribers},
     Error,
 };
-
-use crate::scoped_futures::ScopedFutureExt;
 
 pub type FcmUid = String;
 
@@ -70,34 +68,28 @@ impl Repo {
         tz_offset: i32,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
-        conn.transaction(move |conn| {
-            let address = address.as_base58_string();
-            let lang = lang.to_string();
+        let address = address.as_base58_string();
+        let lang = lang.to_string();
 
-            async move {
-                let device = (
-                    devices::fcm_uid.eq(fcm_uid),
-                    devices::subscriber_address.eq(&address),
-                    devices::language.eq(lang),
-                    devices::utc_offset_seconds.eq(tz_offset),
-                );
+        let device = (
+            devices::fcm_uid.eq(fcm_uid),
+            devices::subscriber_address.eq(&address),
+            devices::language.eq(lang),
+            devices::utc_offset_seconds.eq(tz_offset),
+        );
 
-                diesel::insert_into(subscribers::table)
-                    .values(subscribers::address.eq(&address))
-                    .on_conflict_do_nothing()
-                    .execute(conn)
-                    .await?;
+        diesel::insert_into(subscribers::table)
+            .values(subscribers::address.eq(&address))
+            .on_conflict_do_nothing()
+            .execute(conn)
+            .await?;
 
-                diesel::insert_into(devices::table)
-                    .values(device)
-                    .execute(conn)
-                    .await?;
+        diesel::insert_into(devices::table)
+            .values(device)
+            .execute(conn)
+            .await?;
 
-                Ok(())
-            }
-            .scope_boxed()
-        })
-        .await
+        Ok(())
     }
 
     pub async fn unregister(
@@ -106,34 +98,29 @@ impl Repo {
         fcm_uid: &FcmUid,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
-        conn.transaction(move |conn| {
-            let address = address.as_base58_string();
-            async move {
-                diesel::delete(
-                    devices::table
-                        .filter(devices::subscriber_address.eq(&address))
-                        .filter(devices::fcm_uid.eq(fcm_uid)),
-                )
+        let address = address.as_base58_string();
+
+        diesel::delete(
+            devices::table
+                .filter(devices::subscriber_address.eq(&address))
+                .filter(devices::fcm_uid.eq(fcm_uid)),
+        )
+        .execute(conn)
+        .await?;
+
+        let extra_devices_with_same_addr = devices::table
+            .select(devices::fcm_uid)
+            .filter(devices::subscriber_address.eq(&address))
+            .first::<FcmUid>(conn)
+            .await;
+
+        if optional(extra_devices_with_same_addr)?.is_none() {
+            diesel::delete(subscribers::table.filter(subscribers::address.eq(&address)))
                 .execute(conn)
                 .await?;
+        }
 
-                let extra_devices_with_same_addr = devices::table
-                    .select(devices::fcm_uid)
-                    .filter(devices::subscriber_address.eq(&address))
-                    .first::<FcmUid>(conn)
-                    .await;
-
-                if optional(extra_devices_with_same_addr)?.is_none() {
-                    diesel::delete(subscribers::table.filter(subscribers::address.eq(&address)))
-                        .execute(conn)
-                        .await?;
-                }
-
-                Ok(())
-            }
-            .scope_boxed()
-        })
-        .await
+        Ok(())
     }
 
     pub async fn exists(
@@ -163,35 +150,30 @@ impl Repo {
     ) -> Result<(), Error> {
         #[derive(AsChangeset)]
         #[diesel(table_name = devices)]
-        struct UpdateableDevice {
+        struct DeviceUpdate {
             language: Option<String>,
             utc_offset_seconds: Option<i32>,
             fcm_uid: Option<FcmUid>,
         }
 
-        conn.transaction(move |conn| {
-            let updates = UpdateableDevice {
-                language,
-                utc_offset_seconds,
-                fcm_uid: new_fcm_uid,
-            };
-            let address = address.as_base58_string();
+        let updates = DeviceUpdate {
+            language,
+            utc_offset_seconds,
+            fcm_uid: new_fcm_uid,
+        };
 
-            async move {
-                diesel::update(
-                    devices::table
-                        .filter(devices::fcm_uid.eq(fcm_uid))
-                        .filter(devices::subscriber_address.eq(address.clone())),
-                )
-                .set(&updates)
-                .execute(conn)
-                .await?;
+        let address = address.as_base58_string();
 
-                Ok(())
-            }
-            .scope_boxed()
-        })
-        .await
+        diesel::update(
+            devices::table
+                .filter(devices::fcm_uid.eq(fcm_uid))
+                .filter(devices::subscriber_address.eq(address.clone())),
+        )
+        .set(&updates)
+        .execute(conn)
+        .await?;
+
+        Ok(())
     }
 }
 
