@@ -585,6 +585,11 @@ mod json {
             }
         };
 
+        let envelope = serde_json::from_str::<Envelope>(r#"{"T":"osu","_":0,"o":[]}"#)?;
+        assert_eq!(envelope.msg_type, MessageType::OrdersUpdated);
+        assert_eq!(envelope.timestamp, 0);
+        assert_eq!(envelope.data.len(), 0);
+
         let order_cancel = json!(
             {
               "T" : "osu",
