@@ -25,6 +25,14 @@
 | BLOCKCHAIN_UPDATES_URL | YES      |         | Blockchain updates url                     |
 | MATCHER_ADDRESS        | YES      |         | Matcher address (base58)                   |
 | STARTING_HEIGHT        | NO       | None    | [Debug only] Blockchain height to start receiving notifications.<br/>If not set (or zero) uses current height from data  service. |
+| REDIS_HOSTNAME         | YES      |         | Redis instance hostname                    |
+| REDIS_PORT             | NO       | 6379    | Redis port                                 |
+| REDIS_USER             | NO       | default | Redis user, must have write permission     |
+| REDIS_PASSWORD         | YES      |         | Redis password                             |
+| REDIS_STREAM_NAME      | YES      |         | E.g. 'matcher.external.orders.execution'   |
+| REDIS_GROUP_NAME       | YES      |         | E.g. 'push-notifications-service'          |
+| REDIS_CONSUMER_NAME    | YES      |         | E.g. 'push-notifications-0'                |
+| REDIS_BATCH_SIZE       | NO       | 100     | Number of stream items to query at once    |
 
 ### API
 

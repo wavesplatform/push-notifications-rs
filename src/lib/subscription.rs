@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
-use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl};
+use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl, TextExpressionMethods};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use reqwest::Url;
 
@@ -57,10 +57,7 @@ pub enum SubscriptionMode {
 
 #[derive(Debug, PartialEq)]
 pub enum Topic {
-    OrderFulfilled {
-        amount_asset: Asset,
-        price_asset: Asset,
-    },
+    OrderFulfilled,
     PriceThreshold {
         amount_asset: Asset,
         price_asset: Asset,
@@ -128,11 +125,7 @@ impl Topic {
 
         let topic = match topic_kind {
             TopicKind::Orders => {
-                Topic::OrderFulfilled {
-                    //todo: refactor
-                    amount_asset: Asset::Waves,
-                    price_asset: Asset::Waves,
-                }
+                Topic::OrderFulfilled
             }
             TopicKind::PriceThreshold => {
                 let threshold_info = topic_url
@@ -199,9 +192,8 @@ impl Repo {
         conn: &mut AsyncPgConnection,
     ) -> Result<Vec<Subscription>, Error> {
         match event {
-            Event::OrderExecuted { .. } => {
-                //TODO matching_order_subscriptions(...).await
-                todo!("impl find matching subscriptions for OrderExecuted event")
+            Event::OrderExecuted { address, .. } => {
+                self.matching_order_subscriptions(address, conn).await
             }
             Event::PriceChanged {
                 asset_pair,
@@ -219,7 +211,37 @@ impl Repo {
         }
     }
 
-    //TODO async fn matching_order_subscriptions(...) -> Result<Vec<Subscription>, Error> { ... }
+    async fn matching_order_subscriptions(
+        &self,
+        address: &Address,
+        conn: &mut AsyncPgConnection,
+    ) -> Result<Vec<Subscription>, Error> {
+        let rows = subscriptions::table
+            .select((
+                subscriptions::uid,
+                subscriptions::subscriber_address,
+                subscriptions::created_at,
+                subscriptions::topic_type,
+                subscriptions::topic,
+            ))
+            .filter(subscriptions::subscriber_address.eq(address.as_base58_string()))
+            .filter(subscriptions::topic.like("push://orders%"))
+            .order(subscriptions::uid)
+            .load::<(i32, String, DateTime<Utc>, i32, String)>(conn)
+            .await?;
+
+        rows.into_iter()
+            .map(|(uid, address, created_at, topic_type, topic)| {
+                Ok(Subscription {
+                    uid,
+                    subscriber: Address::from_string(&address).expect("address in db"),
+                    created_at,
+                    mode: SubscriptionMode::from_int(topic_type as u8),
+                    topic: Topic::from_url_string(&topic)?.0,
+                })
+            })
+            .collect()
+    }
 
     async fn matching_price_subscriptions(
         &self,
@@ -443,20 +465,14 @@ mod tests {
             (
                 "push://orders",
                 (
-                    Topic::OrderFulfilled {
-                        amount_asset: Asset::Waves,
-                        price_asset: Asset::Waves,
-                    },
+                    Topic::OrderFulfilled,
                     SubscriptionMode::Repeat,
                 ),
             ),
             (
                 "push://orders?oneshot",
                 (
-                    Topic::OrderFulfilled {
-                        amount_asset: Asset::Waves,
-                        price_asset: Asset::Waves,
-                    },
+                    Topic::OrderFulfilled,
                     SubscriptionMode::Once,
                 ),
             ),
@@ -554,18 +570,12 @@ mod tests {
                 "push://price_threshold/8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc/WAVES/2?oneshot",
             ),
             (
-                Topic::OrderFulfilled {
-                    amount_asset: Asset::Waves,
-                    price_asset: Asset::Waves
-                },
+                Topic::OrderFulfilled,
                 SubscriptionMode::Once,
                 "push://orders?oneshot"
             ),
             (
-                Topic::OrderFulfilled {
-                    amount_asset: Asset::Waves,
-                    price_asset: Asset::Waves
-                },
+                Topic::OrderFulfilled,
                 SubscriptionMode::Repeat,
                 "push://orders"
             )

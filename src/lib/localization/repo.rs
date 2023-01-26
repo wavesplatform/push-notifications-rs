@@ -90,6 +90,14 @@ impl Repo {
             Message::PriceThresholdReached { threshold, .. } => format!("{}", threshold),
         };
 
+        let ratio = match message {
+            Message::OrderExecuted { execution, .. } => match execution {
+                OrderExecution::Full => "100".to_string(),
+                OrderExecution::Partial { percentage } => percentage.round().to_string(),
+            },
+            Message::PriceThresholdReached { .. } => "".to_string(),
+        };
+
         let (date, time) = match message {
             Message::OrderExecuted { timestamp, .. }
             | Message::PriceThresholdReached { timestamp, .. } => {
@@ -107,6 +115,7 @@ impl Repo {
             ("pair", &pair),
             ("side", side),
             ("value", &value),
+            ("ratio", &ratio),
             ("date", &date),
             ("time", &time),
         ]);

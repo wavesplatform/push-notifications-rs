@@ -59,8 +59,26 @@ async fn main() -> Result<(), anyhow::Error> {
             starting_height: config.starting_height,
         };
 
-        factory.new_source().await?
+        factory.new_source()
     };
+    let orders_source = {
+        let config = source::orders::SourceConfig {
+            connection: source::orders::RedisConnectionConfig {
+                hostname: config.redis_hostname,
+                port: config.redis_port,
+                user: config.redis_user,
+                password: config.redis_password,
+            },
+            stream: source::orders::RedisStreamConfig {
+                stream_name: config.redis_stream_name,
+                group_name: config.redis_group_name,
+                consumer_name: config.redis_consumer_name,
+            },
+            batch_max_size: config.redis_batch_size,
+        };
+        source::orders::Source::new(config)
+    };
+    let (prices_source, orders_source) = try_join!(prices_source, orders_source)?;
 
     // Unified stream of events
     let (events_tx, events_rx) = mpsc::channel(100); // buffer size is rather arbitrary
@@ -68,7 +86,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // Start event sources
     log::info!("Starting event sources");
     let h_prices_source = task::spawn(prices_source.run(events_tx.clone()));
-    //todo start other sources cloning events_tx
+    let h_orders_source = task::spawn(orders_source.run(events_tx.clone()));
     drop(events_tx); // Make sure only sources now have the tx side of the channel
 
     // Await on all remaining initialization tasks running in background
@@ -81,8 +99,12 @@ async fn main() -> Result<(), anyhow::Error> {
     let h_processor = task::spawn(async { processor.run_event_loop(events_rx, conn).await });
 
     // Join all the background tasks
-    let ((), r_prices_source) = try_join!(h_processor, h_prices_source)?;
+    let ((), r_prices_source, r_orders_source) =
+        try_join!(h_processor, h_prices_source, h_orders_source)?;
     let () = r_prices_source?;
+    let () = r_orders_source?;
+
+    log::info!("Service finished.");
 
     Ok(())
 }

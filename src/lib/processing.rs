@@ -80,6 +80,12 @@ impl MessagePump {
             let msg = self.make_message(&event, &subscription.topic).await?;
             let address = &subscription.subscriber;
             let devices = self.devices.subscribers(address, conn).await?;
+            if devices.is_empty() {
+                log::warn!(
+                    "Subscriber {} has no registered devices - unable to send any messages to him",
+                    address.as_base58_string(),
+                );
+            }
             for device in devices {
                 log::debug!("    Device: {:?}", device);
                 let message = self.localize(&msg, &device.locale);
@@ -114,15 +120,11 @@ impl MessagePump {
                     side,
                     asset_pair: event_assets,
                     execution,
+                    address: _,
                     timestamp,
                 },
-                Topic::OrderFulfilled {
-                    amount_asset: topic_amount_asset,
-                    price_asset: topic_price_asset,
-                },
+                Topic::OrderFulfilled,
             ) => {
-                debug_assert_eq!(event_assets.amount_asset, *topic_amount_asset);
-                debug_assert_eq!(event_assets.price_asset, *topic_price_asset);
                 let (amount_asset, price_asset) = event_assets.assets_as_ref();
                 Message::OrderExecuted {
                     order_type: *order_type,
