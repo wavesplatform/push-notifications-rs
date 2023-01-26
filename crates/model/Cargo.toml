@@ -1,0 +1,8 @@
+[package]
+name = "model"
+version = "0.0.0"
+edition.workspace = true
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+waves-rust = ">=0.2.3"

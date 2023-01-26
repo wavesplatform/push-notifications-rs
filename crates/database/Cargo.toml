@@ -1,0 +1,18 @@
+[package]
+name = "database"
+version = "0.0.0"
+edition.workspace = true
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = [] }
+diesel = { version = "2.0", default-features = false, features = ["chrono", "postgres", "serde_json", "without-deprecated"] }
+diesel-async = { version = "0.2", features = ["postgres", "bb8"] }
+envy = "0.4"
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+
+# Local deps
+model.workspace = true
+error.workspace = true

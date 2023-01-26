@@ -1,0 +1,22 @@
+[package]
+name = "push-notifications-api"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+diesel-async = { version = "0.2", features = ["postgres", "bb8"] }
+envy = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1", features = ["rt-multi-thread"] }
+warp = "0.3"
+wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
+wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.4" }
+
+# Local deps
+database.workspace = true
+model.workspace = true
+error.workspace = true
+
+[[bin]]
+name = "api"
+path = "src/main.rs"

@@ -522,6 +522,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "database"
+version = "0.0.0"
+dependencies = [
+ "chrono",
+ "diesel",
+ "diesel-async",
+ "envy",
+ "error",
+ "model",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "database-migration"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "database",
+ "diesel",
+ "diesel_migrations",
+]
+
+[[package]]
 name = "dataloader"
 version = "0.14.0"
 source = "git+https://github.com/cksac/dataloader-rs?rev=527933#527933928f1be0e7f288df6b0586cf8a83eef885"
@@ -699,6 +725,23 @@ checksum = "aa68f1b12764fab894d2755d2518754e71b4fd80ecfb822714a1206c2aab39bf"
 dependencies = [
  "cc",
  "libc",
+]
+
+[[package]]
+name = "error"
+version = "0.0.0"
+dependencies = [
+ "bb8",
+ "diesel",
+ "diesel-async",
+ "envy",
+ "fcm",
+ "reqwest",
+ "serde_json",
+ "thiserror",
+ "warp",
+ "wavesexchange_apis",
+ "wavesexchange_loaders",
 ]
 
 [[package]]
@@ -1325,6 +1368,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "model"
+version = "0.0.0"
+dependencies = [
+ "chrono",
+ "waves-rust",
+]
+
+[[package]]
 name = "multimap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1755,35 +1806,62 @@ dependencies = [
 ]
 
 [[package]]
-name = "push-notifications-rs"
+name = "push-notifications-api"
+version = "2.0.0"
+dependencies = [
+ "database",
+ "diesel-async",
+ "envy",
+ "error",
+ "model",
+ "serde",
+ "tokio",
+ "warp",
+ "wavesexchange_log",
+ "wavesexchange_warp",
+]
+
+[[package]]
+name = "push-notifications-processor"
 version = "2.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bb8",
  "bigdecimal",
  "bs58",
- "chrono",
- "diesel",
+ "database",
  "diesel-async",
- "diesel_migrations",
  "envy",
- "fcm",
- "itertools",
+ "error",
  "lazy-regex",
+ "model",
  "redis",
  "reqwest",
  "serde",
  "serde_json",
  "thiserror",
  "tokio",
- "warp",
  "waves-protobuf-schemas",
- "waves-rust",
  "wavesexchange_apis",
  "wavesexchange_loaders",
  "wavesexchange_log",
  "wavesexchange_warp",
+]
+
+[[package]]
+name = "push-notifications-sender"
+version = "2.0.0"
+dependencies = [
+ "chrono",
+ "database",
+ "diesel",
+ "envy",
+ "error",
+ "fcm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "wavesexchange_log",
 ]
 
 [[package]]

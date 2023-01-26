@@ -1,0 +1,22 @@
+[package]
+name = "push-notifications-sender"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = [] }
+diesel = { version = "2.0", default-features = false, features = ["chrono", "postgres", "serde_json", "without-deprecated"] }
+envy = "0.4"
+fcm = "0.9" # uses chrono with default features, which transitively uses legacy 'time' crate with security issues
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
+
+# Local deps
+database.workspace = true
+error.workspace = true
+
+[[bin]]
+name = "sender"
+path = "src/main.rs"

@@ -1,14 +1,18 @@
-FROM rust:1.65 AS builder
+FROM rust:1.67 AS builder
 WORKDIR /app
 
 RUN rustup component add rustfmt
 RUN apt-get update && apt-get install -y protobuf-compiler
 
 COPY Cargo.* ./
-COPY ./src ./src
-COPY ./migrations ./migrations
+COPY ./crates ./crates
 
-RUN cargo install -j4 --path .
+RUN cargo test -j4 --workspace
+RUN cargo build -j4 --workspace --release
+RUN cargo install -j4 --path ./crates/database-migration
+RUN cargo install -j4 --path ./crates/push-notifications-api
+RUN cargo install -j4 --path ./crates/push-notifications-processor
+RUN cargo install -j4 --path ./crates/push-notifications-sender
 
 
 FROM debian:11 as runtime
