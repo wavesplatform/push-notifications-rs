@@ -4,32 +4,32 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-async-trait = "0.1.59"
-tokio = { version = "1", features = ["rt-multi-thread"] }
-serde = { version = "1.0", features = ["derive"] }
-waves-rust = ">=0.2.3"
-warp = "0.3"
+anyhow = "1.0"
+async-trait = "0.1"
+bb8 = "0.8"
+bigdecimal = "0.3"
+bs58 = "0.4"
 chrono = { version = "0.4", default-features = false, features = [] }
-serde_json = "1.0"
+diesel = { version = "2.0", default-features = false, features = ["chrono", "postgres", "serde_json", "without-deprecated"] }
+diesel-async = { version = "0.2", features = ["postgres", "bb8"] }
+diesel_migrations = "2.0"
 envy = "0.4"
-thiserror = "1.0"
+fcm = "0.9" # uses chrono with default features, which transitively uses legacy 'time' crate with security issues
+itertools = "0.10"
+lazy-regex = { version = "2", default-features = false, features = ["std", "perf"] } # don't need Unicode support
+redis = { version = "0.22", default-features = false, features = ["aio", "tokio-comp", "streams"] }
 reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+warp = "0.3"
+waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", tag = "rust_v1.4.3-1" }
+waves-rust = ">=0.2.3"
 wavesexchange_apis = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_apis/0.1.23" }
 wavesexchange_loaders = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_loaders/0.2.1" }
 wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
 wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.4" }
-diesel = { version = "2.0", default-features = false, features = ["postgres", "chrono", "serde_json", "without-deprecated"] }
-diesel_migrations = "2.0"
-diesel-async = { version = "0.2", features = ["postgres", "bb8"] }
-anyhow = "1.0"
-itertools = "0.10"
-fcm = "0.9"
-waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", tag = "rust_v1.4.3-1" }
-bs58 = "0.4"
-bb8 = "0.8.0"
-lazy-regex = { version = "2", default-features = false, features = ["std", "perf"] } # don't need Unicode support
-bigdecimal = "0.3"
-redis = { version = "0.22", default-features = false, features = ["aio", "tokio-comp", "streams"] }
 
 [lib]
 name = "lib"
