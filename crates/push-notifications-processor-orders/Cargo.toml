@@ -1,0 +1,26 @@
+[package]
+name = "push-notifications-processor-orders"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = "1.0"
+bigdecimal = "0.3"
+diesel-async = { version = "0.2", features = ["postgres"] }
+envy = "0.4"
+redis = { version = "0.22", default-features = false, features = ["aio", "tokio-comp", "streams"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
+wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.4" }
+
+# Local deps
+database.workspace = true
+model.workspace = true
+error.workspace = true
+processing.workspace = true
+
+[[bin]]
+name = "processor-orders"
+path = "src/main.rs"

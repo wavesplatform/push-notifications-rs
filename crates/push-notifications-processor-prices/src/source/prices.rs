@@ -15,7 +15,7 @@ use super::{
     blockchain_updates::{AppendBlock, BlockchainUpdate, BlockchainUpdatesClient},
     data_service,
 };
-use crate::{asset, processing::EventWithFeedback};
+use processing::{asset, EventWithFeedback};
 
 /// A factory that creates and initializes instances of `Source`
 pub struct SourceFactory<'a> {

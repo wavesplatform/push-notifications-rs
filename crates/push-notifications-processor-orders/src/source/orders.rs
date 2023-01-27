@@ -6,9 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 use database::stream::{Event, OrderExecution, OrderSide, OrderType};
 use model::{Address, Asset, AssetPair, Timestamp};
 
-use crate::{
-    processing::EventWithFeedback,
-};
+use processing::EventWithFeedback;
 
 use self::redis_stream::{HandleError, RedisStreamReader};
 
@@ -105,11 +103,11 @@ mod redis_stream {
     use std::{fmt, future::Future, time::Duration};
 
     use redis::{
-        AsyncCommands,
         streams::{
             StreamInfoConsumersReply, StreamInfoGroupsReply, StreamInfoStreamReply,
             StreamReadOptions, StreamReadReply,
-        }, Value,
+        },
+        AsyncCommands, Value,
     };
 
     #[derive(Clone)]

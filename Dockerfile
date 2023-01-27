@@ -11,7 +11,8 @@ RUN cargo test -j4 --workspace
 RUN cargo build -j4 --workspace --release
 RUN cargo install -j4 --path ./crates/database-migration
 RUN cargo install -j4 --path ./crates/push-notifications-api
-RUN cargo install -j4 --path ./crates/push-notifications-processor
+RUN cargo install -j4 --path ./crates/push-notifications-processor-orders
+RUN cargo install -j4 --path ./crates/push-notifications-processor-prices
 RUN cargo install -j4 --path ./crates/push-notifications-sender
 
 

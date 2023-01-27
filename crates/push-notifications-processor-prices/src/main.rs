@@ -1,14 +1,8 @@
-//! Push notifications Processor service executable
-
-#[macro_use]
-extern crate async_trait;
+//! Push notifications prices processor service executable
 
 extern crate wavesexchange_log as log;
 
-mod asset;
 mod config;
-mod localization;
-mod processing;
 mod source;
 
 use std::sync::Arc;
@@ -19,9 +13,7 @@ use tokio::{sync::mpsc, task, try_join};
 use wavesexchange_warp::MetricsWarpBuilder;
 
 use database::{device, message, subscription};
-use crate::{
-    processing::MessagePump,
-};
+use processing::{asset, localization, MessagePump};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -30,7 +22,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let config = config::Config::load()?;
 
     log::info!(
-        "Starting push-notifications processor service with {:?}",
+        "Starting push-notifications price processor service with {:?}",
         config
     );
 
@@ -63,7 +55,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let messages = message::Queue {};
 
     // Create event sources
-    log::info!("Initializing event sources");
+    log::info!("Initializing price event source");
     let prices_source = {
         let factory = source::prices::SourceFactory {
             data_service_url: &config.data_service_url,
@@ -75,35 +67,15 @@ async fn main() -> Result<(), anyhow::Error> {
             starting_height: config.starting_height,
         };
 
-        factory.new_source()
+        factory.new_source().await?
     };
-    let orders_source = {
-        let config = source::orders::SourceConfig {
-            connection: source::orders::RedisConnectionConfig {
-                hostname: config.redis_hostname,
-                port: config.redis_port,
-                user: config.redis_user,
-                password: config.redis_password,
-            },
-            stream: source::orders::RedisStreamConfig {
-                stream_name: config.redis_stream_name,
-                group_name: config.redis_group_name,
-                consumer_name: config.redis_consumer_name,
-            },
-            batch_max_size: config.redis_batch_size,
-        };
-        source::orders::Source::new(config)
-    };
-    let (prices_source, orders_source) = try_join!(prices_source, orders_source)?;
 
     // Unified stream of events
     let (events_tx, events_rx) = mpsc::channel(100); // buffer size is rather arbitrary
 
     // Start event sources
-    log::info!("Starting event sources");
-    let h_prices_source = task::spawn(prices_source.run(events_tx.clone()));
-    let h_orders_source = task::spawn(orders_source.run(events_tx.clone()));
-    drop(events_tx); // Make sure only sources now have the tx side of the channel
+    log::info!("Starting price event source");
+    let h_prices_source = task::spawn(prices_source.run(events_tx));
 
     // Await on all remaining initialization tasks running in background
     let localizer = localizer.await??;
@@ -118,10 +90,8 @@ async fn main() -> Result<(), anyhow::Error> {
     //let () = init_finished_tx.send(()).expect("init"); //TODO readyz
 
     // Join all the background tasks
-    let ((), r_prices_source, r_orders_source) =
-        try_join!(h_processor, h_prices_source, h_orders_source)?;
+    let ((), r_prices_source) = try_join!(h_processor, h_prices_source)?;
     let () = r_prices_source?;
-    let () = r_orders_source?;
 
     log::info!("Service finished.");
 
