@@ -5,7 +5,7 @@ use std::fmt;
 use serde::Deserialize;
 use error::Error;
 
-use model::{AsBase58String, Address};
+use model::waves::{Address, AsBase58String};
 
 #[derive(Clone)]
 pub struct Config {

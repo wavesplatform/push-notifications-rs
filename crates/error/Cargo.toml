@@ -6,7 +6,7 @@ edition.workspace = true
 [dependencies]
 bb8 = "0.8"
 diesel = { version = "2.0", default-features = false, features = ["chrono", "postgres", "serde_json", "without-deprecated"] }
-diesel-async = { version = "0.2", features = ["postgres", "bb8"] }
+diesel-async = { version = "0.2", features = ["postgres"] }
 envy = "0.4"
 fcm = "0.9" # uses chrono with default features, which transitively uses legacy 'time' crate with security issues
 reqwest = { version = "0.11", features = ["json"] }

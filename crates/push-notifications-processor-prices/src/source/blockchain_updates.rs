@@ -10,8 +10,7 @@ use waves_protobuf_schemas::{
     },
 };
 
-use database::stream::RawPrice;
-use model::{Address, Asset, Timestamp};
+use model::{asset::Asset, price::RawPrice, time::Timestamp, waves::Address};
 
 #[derive(Debug)]
 pub(super) enum BlockchainUpdate {
@@ -115,18 +114,18 @@ mod convert {
     /// This module reexports all necessary structs from the protobuf crate, for convenience.
     mod proto {
         pub(super) use waves_protobuf_schemas::waves::{
-            Block,
             events::{
                 blockchain_updated::{
                     append::{BlockAppend, Body, MicroBlockAppend},
                     Append, Update,
                 },
-                BlockchainUpdated,
-                transaction_metadata::{ExchangeMetadata, Metadata}, TransactionMetadata,
+                transaction_metadata::{ExchangeMetadata, Metadata},
+                BlockchainUpdated, TransactionMetadata,
             },
-            ExchangeTransactionData,
-            MicroBlock, signed_transaction, SignedMicroBlock, SignedTransaction, Transaction,
+            signed_transaction,
             transaction::Data,
+            Block, ExchangeTransactionData, MicroBlock, SignedMicroBlock, SignedTransaction,
+            Transaction,
         };
     }
 
@@ -135,7 +134,11 @@ mod convert {
         pub(super) use super::super::{
             AppendBlock, BlockchainUpdate, Rollback, Transaction, TxExchange,
         };
-        pub(super) use model::{Address, Asset, AssetId, Timestamp};
+        pub(super) use model::{
+            asset::Asset,
+            time::Timestamp,
+            waves::{Address, AssetId},
+        };
     }
 
     #[derive(Error, Debug)]

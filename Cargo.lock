@@ -531,10 +531,8 @@ dependencies = [
  "envy",
  "error",
  "model",
- "reqwest",
  "serde",
  "serde_json",
- "thiserror",
 ]
 
 [[package]]
@@ -1372,6 +1370,10 @@ name = "model"
 version = "0.0.0"
 dependencies = [
  "chrono",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
  "waves-rust",
 ]
 

@@ -3,8 +3,13 @@
 use bigdecimal::BigDecimal;
 use tokio::sync::{mpsc, oneshot};
 
-use database::stream::{Event, OrderExecution, OrderSide, OrderType};
-use model::{Address, Asset, AssetPair, Timestamp};
+use model::{
+    asset::{Asset, AssetPair},
+    event::Event,
+    order::{OrderExecution, OrderSide, OrderType},
+    time::Timestamp,
+    waves::Address,
+};
 
 use processing::EventWithFeedback;
 
@@ -413,7 +418,7 @@ mod json {
     use bigdecimal::BigDecimal;
     use serde::Deserialize;
 
-    use model::Timestamp;
+    use model::time::Timestamp;
 
     pub(super) fn parse_orders(json: &[u8]) -> serde_json::Result<(Vec<OrderUpdate>, Timestamp)> {
         let envelope = serde_json::from_slice::<Envelope>(json)?;

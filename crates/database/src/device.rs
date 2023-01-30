@@ -2,25 +2,12 @@ use diesel::{result::Error as DslError, AsChangeset, ExpressionMethods, QueryDsl
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use error::Error;
-use model::{Address, AsBase58String, Lang};
+use model::{
+    device::{Device, FcmUid, LocaleInfo},
+    waves::{Address, AsBase58String},
+};
 
 use crate::schema::{devices, subscribers};
-
-pub type FcmUid = String;
-
-#[derive(Debug)]
-pub struct Device {
-    pub device_uid: i32,
-    pub address: Address,
-    pub fcm_uid: FcmUid,
-    pub locale: LocaleInfo,
-}
-
-#[derive(Debug)]
-pub struct LocaleInfo {
-    pub lang: Lang,
-    pub utc_offset_seconds: i32,
-}
 
 #[derive(Clone)]
 pub struct Repo {}

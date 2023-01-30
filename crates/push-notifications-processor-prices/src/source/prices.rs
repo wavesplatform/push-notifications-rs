@@ -7,8 +7,13 @@ use tokio::{
     try_join,
 };
 
-use database::stream::{Event, PriceRange, PriceWithDecimals};
-use model::{Address, AssetPair, Timestamp};
+use model::{
+    asset::AssetPair,
+    event::Event,
+    price::{PriceRange, PriceWithDecimals},
+    time::Timestamp,
+    waves::Address,
+};
 
 use self::aggregator::PriceAggregator;
 use super::{
@@ -212,7 +217,7 @@ enum Error {
 }
 
 mod aggregator {
-    use database::stream::{Price, PriceRange};
+    use model::price::{Price, PriceRange};
     use std::mem::take;
 
     pub(super) struct PriceAggregator {

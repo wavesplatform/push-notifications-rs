@@ -1,5 +1,5 @@
 use super::lokalise_gateway::dto::KeysResponse;
-use model::Lang;
+use model::device::Lang;
 use std::{
     collections::{BTreeSet, HashMap},
     fmt,

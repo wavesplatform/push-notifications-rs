@@ -1,16 +1,19 @@
 //! Interaction with the Data Service
 
-use model::{Address, AsBase58String, Asset, AssetPair};
 use anyhow::ensure;
+use model::{
+    asset::{Asset, AssetPair},
+    price::Price,
+    waves::{Address, AsBase58String},
+};
 use wavesexchange_apis::{
     bigdecimal::ToPrimitive,
     data_service::{
-        DataService,
         dto::{self, Sort},
+        DataService,
     },
     HttpClient,
 };
-use database::stream::Price;
 
 pub(super) struct Pair {
     pub pair: AssetPair,

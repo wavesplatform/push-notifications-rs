@@ -1,10 +1,10 @@
-use database::{
+use error::Error;
+use model::{
     device::LocaleInfo,
     message::{LocalizedMessage, Message},
-    stream::{OrderExecution, OrderSide},
+    order::{OrderExecution, OrderSide},
+    time::Timestamp,
 };
-use error::Error;
-use model::Timestamp;
 use std::collections::HashMap;
 
 use super::{

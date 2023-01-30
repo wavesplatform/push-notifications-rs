@@ -1,7 +1,7 @@
 use crate::db::PgAsyncPool;
 use database::{device, subscription};
 use error::Error;
-use model::Address;
+use model::waves::Address;
 use std::sync::Arc;
 use warp::{Filter, Rejection};
 use wavesexchange_warp::{
@@ -127,12 +127,12 @@ pub async fn start(
 mod controllers {
     use super::{dto, Pool};
     use database::{
-        device::{self, FcmUid},
-        subscription::{self, SubscriptionRequest, Topic},
+        device,
+        subscription::{self, SubscriptionRequest},
     };
     use diesel_async::AsyncConnection;
     use error::Error;
-    use model::Address;
+    use model::{device::FcmUid, topic::Topic, waves::Address};
     use warp::{http::StatusCode, reply::Json, Rejection};
 
     use diesel_async::scoped_futures::ScopedFutureExt as _;
@@ -264,7 +264,8 @@ mod controllers {
             .topics
             .into_iter()
             .map(|topic_url| {
-                let (topic, mode) = Topic::from_url_string(&topic_url).map_err(|e| Error::BadTopic(e.to_string()))?;
+                let (topic, mode) = Topic::from_url_string(&topic_url)
+                    .map_err(|e| Error::BadTopic(e.to_string()))?;
                 Ok(SubscriptionRequest {
                     // as_url_string removes junk from topic_url (like anchors or extra query params)
                     topic_url: topic.as_url_string(mode),

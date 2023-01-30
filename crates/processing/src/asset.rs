@@ -1,10 +1,10 @@
-use model::Asset;
+use error::Error;
+use model::asset::Asset;
 use wavesexchange_apis::{
     assets::dto::{AssetInfo, OutputFormat},
     AssetsService, HttpClient,
 };
 use wavesexchange_loaders::{CachedLoader, Loader as _, TimedCache};
-use error::Error;
 
 type Ticker = String;
 

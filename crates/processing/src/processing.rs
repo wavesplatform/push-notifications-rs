@@ -1,13 +1,16 @@
 use crate::{asset, localization};
-use database::{
-    device::{self, Device, LocaleInfo},
-    message::{self, LocalizedMessage, Message, MessageData, PreparedMessage},
-    stream::{Event, OrderExecution},
-    subscription::{self, SubscriptionMode, Topic},
-};
+use database::{device, message, subscription};
 use diesel_async::{AsyncConnection, AsyncPgConnection};
 use error::Error;
-use model::{AsBase58String, Asset};
+use model::{
+    asset::Asset,
+    device::{Device, LocaleInfo},
+    event::Event,
+    message::{LocalizedMessage, Message, MessageData, PreparedMessage},
+    order::OrderExecution,
+    topic::{SubscriptionMode, Topic},
+    waves::AsBase58String,
+};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
