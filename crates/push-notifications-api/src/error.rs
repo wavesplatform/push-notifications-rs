@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use diesel_async::pooled_connection::PoolError;
 use warp::reject::Reject;
 
@@ -7,9 +5,6 @@ use warp::reject::Reject;
 pub enum Error {
     #[error("Error: {0}")]
     Generic(String),
-
-    #[error("Validation error: {0}")]
-    ValidationError(String, Option<HashMap<String, String>>),
 
     #[error("Database query error: {0}")]
     DbQueryError(#[from] diesel::result::Error),

@@ -22,13 +22,6 @@ pub async fn start(
     pool: PgAsyncPool,
 ) {
     let error_handler = handler(ERROR_CODES_PREFIX, |err| match err {
-        Error::ValidationError(field, error_details) => {
-            let mut error_details = error_details.to_owned();
-            if let Some(details) = error_details.as_mut() {
-                details.insert("parameter".to_owned(), field.to_owned());
-            }
-            validation::invalid_parameter(ERROR_CODES_PREFIX, error_details)
-        }
         Error::DbQueryError(e) => {
             log::error!(e);
             validation::invalid_parameter(ERROR_CODES_PREFIX, None)
