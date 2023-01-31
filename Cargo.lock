@@ -529,10 +529,10 @@ dependencies = [
  "diesel",
  "diesel-async",
  "envy",
- "error",
  "model",
  "serde",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -723,23 +723,6 @@ checksum = "aa68f1b12764fab894d2755d2518754e71b4fd80ecfb822714a1206c2aab39bf"
 dependencies = [
  "cc",
  "libc",
-]
-
-[[package]]
-name = "error"
-version = "0.0.0"
-dependencies = [
- "bb8",
- "diesel",
- "diesel-async",
- "envy",
- "fcm",
- "reqwest",
- "serde_json",
- "thiserror",
- "warp",
- "wavesexchange_apis",
- "wavesexchange_loaders",
 ]
 
 [[package]]
@@ -1713,12 +1696,13 @@ version = "0.0.0"
 dependencies = [
  "async-trait",
  "database",
+ "diesel",
  "diesel-async",
- "error",
  "lazy-regex",
  "model",
  "reqwest",
  "serde",
+ "thiserror",
  "tokio",
  "wavesexchange_apis",
  "wavesexchange_loaders",
@@ -1829,12 +1813,15 @@ dependencies = [
 name = "push-notifications-api"
 version = "2.0.0"
 dependencies = [
+ "anyhow",
+ "bb8",
  "database",
+ "diesel",
  "diesel-async",
  "envy",
- "error",
  "model",
  "serde",
+ "thiserror",
  "tokio",
  "warp",
  "wavesexchange_log",
@@ -1850,7 +1837,6 @@ dependencies = [
  "database",
  "diesel-async",
  "envy",
- "error",
  "model",
  "processing",
  "redis",
@@ -1870,7 +1856,6 @@ dependencies = [
  "database",
  "diesel-async",
  "envy",
- "error",
  "model",
  "processing",
  "serde",
@@ -1886,11 +1871,11 @@ dependencies = [
 name = "push-notifications-sender"
 version = "2.0.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "database",
  "diesel",
  "envy",
- "error",
  "fcm",
  "serde",
  "serde_json",

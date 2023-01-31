@@ -8,10 +8,9 @@ mod config;
 use chrono::{DateTime, Utc};
 use diesel::{prelude::*, Connection, PgConnection};
 use std::fmt;
-use error::Error;
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> anyhow::Result<()> {
     // Configs
     let pg_config = database::config::Config::load()?;
     let config = config::Config::load()?;
@@ -118,7 +117,7 @@ struct FcmRemoteGateway {
 }
 
 impl FcmRemoteGateway {
-    pub async fn send(&self, message: &MessageToSend) -> Result<(), Error> {
+    pub async fn send(&self, message: &MessageToSend) -> anyhow::Result<()> {
         if !self.dry_run {
             let fcm_msg = self.fcm_message(&message);
             let fcm_response = self.client.send(fcm_msg).await?; // todo handle errors from FcmResponse body
@@ -162,7 +161,6 @@ mod postgres {
     use chrono::{DateTime, Utc};
     use database::schema::{devices, messages};
     use diesel::{prelude::*, PgConnection};
-    use error::Error;
 
     // todo separate business logic from DB I/O
     pub fn nack(
@@ -171,7 +169,7 @@ mod postgres {
         new_send_attempts_count: i16,
         new_send_error: String,
         new_scheduled_for: DateTime<Utc>,
-    ) -> Result<(), Error> {
+    ) -> anyhow::Result<()> {
         diesel::update(messages::table)
             .filter(messages::uid.eq(message_uid))
             .set((
@@ -183,7 +181,7 @@ mod postgres {
         Ok(())
     }
 
-    pub fn ack(conn: &mut PgConnection, message_uid: i32) -> Result<(), Error> {
+    pub fn ack(conn: &mut PgConnection, message_uid: i32) -> anyhow::Result<()> {
         diesel::delete(messages::table.filter(messages::uid.eq(message_uid))).execute(conn)?;
         Ok(())
     }
@@ -191,7 +189,7 @@ mod postgres {
     pub fn dequeue(
         conn: &mut PgConnection,
         max_send_attempts: i16,
-    ) -> Result<Option<MessageToSend>, Error> {
+    ) -> anyhow::Result<Option<MessageToSend>> {
         Ok(messages::table
             .inner_join(devices::table.on(messages::device_uid.eq(devices::uid)))
             .select((

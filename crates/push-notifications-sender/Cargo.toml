@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+anyhow = "1.0"
 chrono = { version = "0.4", default-features = false, features = [] }
 diesel = { version = "2.0", default-features = false, features = ["chrono", "postgres", "serde_json", "without-deprecated"] }
 envy = "0.4"
@@ -15,7 +16,6 @@ wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs"
 
 # Local deps
 database.workspace = true
-error.workspace = true
 
 [[bin]]
 name = "sender"

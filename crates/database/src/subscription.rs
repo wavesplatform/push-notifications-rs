@@ -4,7 +4,6 @@ use chrono::{DateTime, Utc};
 use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl, TextExpressionMethods};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
-use error::Error;
 use model::{
     event::Event,
     price::PriceRange,
@@ -12,7 +11,10 @@ use model::{
     waves::{Address, AsBase58String},
 };
 
-use crate::schema::{subscribers, subscriptions, topics_price_threshold};
+use crate::{
+    error::Error,
+    schema::{subscribers, subscriptions, topics_price_threshold},
+};
 
 #[derive(Debug)]
 pub struct Subscription {
@@ -85,9 +87,7 @@ impl Repo {
                     subscriber: Address::from_string(&address).expect("address in db"),
                     created_at,
                     mode: SubscriptionMode::from_int(topic_type as u8),
-                    topic: Topic::from_url_string(&topic)
-                        .map_err(|e| Error::BadTopic(e.to_string()))?
-                        .0,
+                    topic: Topic::from_url_string(&topic)?.0,
                 })
             })
             .collect()
@@ -133,9 +133,7 @@ impl Repo {
                     subscriber: Address::from_string(&address).expect("address in db"),
                     created_at,
                     mode: SubscriptionMode::from_int(topic_type as u8),
-                    topic: Topic::from_url_string(&topic)
-                        .map_err(|e| Error::BadTopic(e.to_string()))?
-                        .0,
+                    topic: Topic::from_url_string(&topic)?.0,
                 })
             })
             .collect()
@@ -173,13 +171,17 @@ impl Repo {
             .iter()
             .filter(|subscr| !existing_topics.contains(&subscr.topic_url));
 
+        //TODO The following fragment definitely contains a logical error and must be rewritten:
+        // It attempts to zip HashMap (with undefined order of elements) with other collection,
+        // which will result in mixed up pairs of topic url & subscription.
+
         // if db contains "topic_name" topic and the request has "topic_name?oneshot",
         // remove old topic from subscriptions and topics_price_threshold tables and insert the new one
         let subscriptions_to_update_sub_mode = existing_topics
             .iter()
             .map(|topic_url| {
                 let (topic, sub_mode) =
-                    Topic::from_url_string(&topic_url).expect("broken topic url");
+                    Topic::from_url_string(&topic_url).expect("broken topic url"); //TODO don't unwrap, convert and propagate this error
                 (topic_url, topic, sub_mode)
             })
             .zip(filtered_subscriptions.clone())

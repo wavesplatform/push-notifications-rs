@@ -5,8 +5,6 @@ use std::fmt;
 use chrono::Duration;
 use serde::Deserialize;
 
-use error::Error;
-
 #[derive(Clone)]
 pub struct Config {
     pub empty_queue_poll_period: Duration,
@@ -19,7 +17,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load() -> Result<Self, Error> {
+    pub fn load() -> Result<Self, envy::Error> {
         Ok(envy::from_env::<ConfigFlat>()?.into())
     }
 }

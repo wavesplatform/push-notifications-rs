@@ -1,13 +1,15 @@
 use diesel::{result::Error as DslError, AsChangeset, ExpressionMethods, QueryDsl};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
-use error::Error;
 use model::{
     device::{Device, FcmUid, LocaleInfo},
     waves::{Address, AsBase58String},
 };
 
-use crate::schema::{devices, subscribers};
+use crate::{
+    error::Error,
+    schema::{devices, subscribers},
+};
 
 #[derive(Clone)]
 pub struct Repo {}

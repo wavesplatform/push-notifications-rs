@@ -5,4 +5,7 @@ mod repo;
 mod template;
 mod translations;
 
-pub use self::{lokalise_gateway::LokaliseConfig, repo::Repo};
+pub use self::{
+    lokalise_gateway::{GatewayError, LokaliseConfig},
+    repo::Repo,
+};

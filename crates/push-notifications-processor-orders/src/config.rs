@@ -2,7 +2,6 @@
 
 use std::fmt;
 
-use error::Error;
 use serde::Deserialize;
 
 #[derive(Clone)]
@@ -41,7 +40,7 @@ impl fmt::Debug for Config {
 }
 
 impl Config {
-    pub fn load() -> Result<Self, Error> {
+    pub fn load() -> Result<Self, envy::Error> {
         let config = envy::from_env::<RawConfig>()?;
         let config = Config {
             metrics_port: config.metrics_port,

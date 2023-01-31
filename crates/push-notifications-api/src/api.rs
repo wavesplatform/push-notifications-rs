@@ -1,6 +1,6 @@
 use crate::db::PgAsyncPool;
+use crate::error::Error;
 use database::{device, subscription};
-use error::Error;
 use model::waves::Address;
 use std::sync::Arc;
 use warp::{Filter, Rejection};
@@ -126,12 +126,12 @@ pub async fn start(
 
 mod controllers {
     use super::{dto, Pool};
+    use crate::error::Error;
     use database::{
         device,
         subscription::{self, SubscriptionRequest},
     };
     use diesel_async::AsyncConnection;
-    use error::Error;
     use model::{device::FcmUid, topic::Topic, waves::Address};
     use warp::{http::StatusCode, reply::Json, Rejection};
 
@@ -153,7 +153,8 @@ mod controllers {
                 }
                 .scope_boxed()
             })
-            .await?;
+            .await
+            .map_err(|e| Error::from(e))?;
 
         Ok(StatusCode::NO_CONTENT)
     }
@@ -221,7 +222,8 @@ mod controllers {
                 }
                 .scope_boxed()
             })
-            .await?;
+            .await
+            .map_err(|e| Error::from(e))?;
 
         let response = if has_fcm {
             StatusCode::OK
@@ -249,7 +251,8 @@ mod controllers {
                 }
                 .scope_boxed()
             })
-            .await?;
+            .await
+            .map_err(|e| Error::from(e))?;
 
         Ok(StatusCode::NO_CONTENT)
     }
@@ -264,8 +267,7 @@ mod controllers {
             .topics
             .into_iter()
             .map(|topic_url| {
-                let (topic, mode) = Topic::from_url_string(&topic_url)
-                    .map_err(|e| Error::BadTopic(e.to_string()))?;
+                let (topic, mode) = Topic::from_url_string(&topic_url)?;
                 Ok(SubscriptionRequest {
                     // as_url_string removes junk from topic_url (like anchors or extra query params)
                     topic_url: topic.as_url_string(mode),
@@ -285,7 +287,8 @@ mod controllers {
                 }
                 .scope_boxed()
             })
-            .await?;
+            .await
+            .map_err(|e| Error::from(e))?;
 
         Ok(StatusCode::NO_CONTENT)
     }
@@ -306,7 +309,8 @@ mod controllers {
                 }
                 .scope_boxed()
             })
-            .await?;
+            .await
+            .map_err(|e| Error::from(e))?;
 
         Ok(warp::reply::json(&dto::Topics { topics }))
     }

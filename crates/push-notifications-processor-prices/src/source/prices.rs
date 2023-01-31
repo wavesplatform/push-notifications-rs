@@ -213,7 +213,7 @@ impl Source {
 
 enum Error {
     StopProcessing,
-    EventProcessingFailed(error::Error),
+    EventProcessingFailed(processing::Error),
 }
 
 mod aggregator {

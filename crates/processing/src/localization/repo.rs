@@ -1,4 +1,3 @@
-use error::Error;
 use model::{
     device::LocaleInfo,
     message::{LocalizedMessage, Message},
@@ -12,6 +11,8 @@ use super::{
     template::interpolate,
     translations::TranslationMap,
 };
+
+use crate::error::Error;
 
 mod lokalise_keys {
     pub const ORDER_FILLED_TITLE: &str = "orderFilledTitle";
@@ -30,7 +31,7 @@ pub struct Repo {
 impl Repo {
     pub async fn new(config: LokaliseConfig) -> Result<Self, Error> {
         let remote_gateway = RemoteGateway::new(LOCALISE_API_URL, &config.token);
-        let keys = remote_gateway.keys_for_project(&config.project_id).await?;
+        let keys = remote_gateway.keys_for_project(&config.project_id).await.map_err(Error::LocalizationApiError)?;
         let translations = TranslationMap::build(keys);
         if translations.is_complete() {
             log::trace!("Lokalise translations: {:?}", translations);

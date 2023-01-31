@@ -5,12 +5,12 @@ extern crate wavesexchange_log as log;
 mod api;
 mod config;
 mod db;
+mod error;
 
 use database::{device, subscription};
-use error::Error;
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<(), anyhow::Error> {
     let pg_config = database::config::Config::load()?;
     let config = config::Config::load()?;
     log::info!("Starting push-notifications api service with {:?}", config);

@@ -1,4 +1,3 @@
-use error::Error;
 use wavesexchange_apis::HttpClient;
 
 //TODO Move to config
@@ -13,8 +12,10 @@ pub(super) struct RemoteGateway {
     lokalise_client: HttpClient<()>,
 }
 
+pub type GatewayError = wavesexchange_apis::Error;
+
 impl RemoteGateway {
-    pub fn new(api_url: &str, api_token: &str) -> Self {
+    pub(super) fn new(api_url: &str, api_token: &str) -> Self {
         let lokalise_client = HttpClient::<()>::builder()
             .with_base_url(api_url)
             .with_reqwest_builder(|req| {
@@ -28,7 +29,10 @@ impl RemoteGateway {
         RemoteGateway { lokalise_client }
     }
 
-    pub async fn keys_for_project(&self, project_id: &str) -> Result<dto::KeysResponse, Error> {
+    pub(super) async fn keys_for_project(
+        &self,
+        project_id: &str,
+    ) -> Result<dto::KeysResponse, GatewayError> {
         self.lokalise_client
             .create_req_handler::<dto::KeysResponse>(
                 self.lokalise_client
@@ -37,7 +41,6 @@ impl RemoteGateway {
             )
             .execute()
             .await
-            .map_err(Error::from)
     }
 }
 

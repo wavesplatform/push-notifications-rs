@@ -10,6 +10,5 @@ edition = "2021"
 [workspace.dependencies]
 # Local crates
 database = { path = "./crates/database", version = "0.0.0" }
-error = { path = "./crates/error", version = "0.0.0" }
 model = { path = "./crates/model", version = "0.0.0" }
 processing = { path = "./crates/processing", version = "0.0.0" }

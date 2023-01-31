@@ -2,8 +2,6 @@
 
 use serde::Deserialize;
 
-use error::Error;
-
 fn default_port() -> u16 {
     8080
 }
@@ -27,7 +25,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load() -> Result<Config, Error> {
+    pub fn load() -> Result<Config, envy::Error> {
         let config_flat = envy::from_env::<ConfigFlat>()?;
 
         Ok(Config {

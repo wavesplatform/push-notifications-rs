@@ -5,8 +5,13 @@ extern crate async_trait;
 
 extern crate wavesexchange_log as log;
 
-pub mod asset;
-pub mod localization;
+mod error;
 mod processing;
 
-pub use crate::processing::{EventWithFeedback, MessagePump};
+pub mod asset;
+pub mod localization;
+
+pub use crate::{
+    error::Error,
+    processing::{EventWithFeedback, MessagePump},
+};

@@ -19,7 +19,6 @@ wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs
 # Local deps
 database.workspace = true
 model.workspace = true
-error.workspace = true
 processing.workspace = true
 
 [[bin]]

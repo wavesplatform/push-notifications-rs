@@ -1,10 +1,9 @@
-use error::Error;
 use model::asset::Asset;
 use wavesexchange_apis::{
     assets::dto::{AssetInfo, OutputFormat},
     AssetsService, HttpClient,
 };
-use wavesexchange_loaders::{CachedLoader, Loader as _, TimedCache};
+use wavesexchange_loaders::{CachedLoader, Loader as _, LoaderError, TimedCache};
 
 type Ticker = String;
 
@@ -18,6 +17,8 @@ pub struct RemoteGateway {
     assets_client: HttpClient<AssetsService>,
 }
 
+pub type GatewayError = LoaderError<wavesexchange_apis::Error>;
+
 impl RemoteGateway {
     pub fn new(asset_service_url: impl AsRef<str>) -> Self {
         let url = asset_service_url.as_ref();
@@ -25,17 +26,17 @@ impl RemoteGateway {
         RemoteGateway { assets_client }
     }
 
-    pub async fn preload(&self, assets: Vec<Asset>) -> Result<(), Error> {
+    pub async fn preload(&self, assets: Vec<Asset>) -> Result<(), GatewayError> {
         let _ = self.load_many(assets).await?;
         Ok(())
     }
 
-    pub async fn ticker(&self, asset: &Asset) -> Result<Option<Ticker>, Error> {
+    pub async fn ticker(&self, asset: &Asset) -> Result<Option<Ticker>, GatewayError> {
         self.asset_info(asset).await.map(|a| a.ticker)
     }
 
-    async fn asset_info(&self, asset: &Asset) -> Result<LocalAssetInfo, Error> {
-        self.load(asset.to_owned()).await.map_err(Error::from)
+    async fn asset_info(&self, asset: &Asset) -> Result<LocalAssetInfo, GatewayError> {
+        self.load(asset.to_owned()).await
     }
 }
 
@@ -43,7 +44,7 @@ impl RemoteGateway {
 impl CachedLoader<Asset, LocalAssetInfo> for RemoteGateway {
     type Cache = TimedCache<Asset, LocalAssetInfo>;
 
-    type Error = Error;
+    type Error = wavesexchange_apis::Error;
 
     async fn load_fn(&mut self, keys: &[Asset]) -> Result<Vec<LocalAssetInfo>, Self::Error> {
         let asset_ids = keys.iter().map(|k| k.id()).collect::<Vec<_>>();

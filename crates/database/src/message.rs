@@ -1,10 +1,9 @@
 use diesel::ExpressionMethods;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
-use error::Error;
 use model::message::PreparedMessage;
 
-use crate::schema::messages;
+use crate::{error::Error, schema::messages};
 
 /// Message queue in the database
 pub struct Queue {}
@@ -15,11 +14,16 @@ impl Queue {
         message: PreparedMessage,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
+        // This conversion can only fail due to a programming error
+        // (see `to_value` docs), so using unwrap is safe and no need
+        // to propagate error here
+        let data = serde_json::to_value(message.data).expect("serialize json");
+
         let values = (
             messages::device_uid.eq(message.device.device_uid),
             messages::notification_title.eq(message.message.notification_title),
             messages::notification_body.eq(message.message.notification_body),
-            messages::data.eq(serde_json::to_value(message.data)?),
+            messages::data.eq(data),
             messages::collapse_key.eq(message.collapse_key),
         );
         let num_rows = diesel::insert_into(messages::table)

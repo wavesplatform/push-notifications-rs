@@ -3,9 +3,10 @@
 use std::fmt;
 
 use serde::Deserialize;
-use error::Error;
 
 use model::waves::{Address, AsBase58String};
+
+use self::error::Error;
 
 #[derive(Clone)]
 pub struct Config {
@@ -74,4 +75,17 @@ struct RawConfig {
 
 fn default_metrics_port() -> u16 {
     9090
+}
+
+pub mod error {
+    use thiserror::Error;
+
+    #[derive(Debug, Error)]
+    pub enum Error {
+        #[error("LoadConfigFailed: {0}")]
+        LoadConfigFailed(#[from] envy::Error),
+
+        #[error("BadConfigValue: {0}")]
+        BadConfigValue(&'static str),
+    }
 }

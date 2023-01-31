@@ -1,11 +1,10 @@
-use std::time::Duration;
-
+use crate::error::Error;
 use database::config::Config;
-use error::Error;
 use diesel_async::{
     pooled_connection::{bb8::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
+use std::time::Duration;
 
 pub type PgAsyncPool = Pool<AsyncPgConnection>;
 
