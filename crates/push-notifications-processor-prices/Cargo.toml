@@ -4,17 +4,17 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-anyhow = "1.0"
-bs58 = "0.4"
-diesel-async = { version = "0.2", features = ["postgres"] }
-envy = "0.4"
-serde = { version = "1.0", features = ["derive"] }
-thiserror = "1.0"
-tokio = { version = "1", features = ["rt-multi-thread"] }
-waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", tag = "rust_v1.4.3-1" }
-wavesexchange_apis = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_apis/0.1.23" }
-wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
-wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.4" }
+anyhow.workspace = true
+bs58.workspace = true
+diesel-async.workspace = true
+envy.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+waves-protobuf-schemas.workspace = true
+wavesexchange_apis.workspace = true
+wavesexchange_log.workspace = true
+wavesexchange_warp.workspace = true
 
 # Local deps
 database.workspace = true

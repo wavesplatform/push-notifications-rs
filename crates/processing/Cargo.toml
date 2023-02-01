@@ -4,17 +4,17 @@ version = "0.0.0"
 edition.workspace = true
 
 [dependencies]
-async-trait = "0.1"
-diesel = { version = "2.0", default-features = false, features = ["postgres"] }
-diesel-async = { version = "0.2", features = ["postgres"] }
-lazy-regex = { version = "2", default-features = false, features = ["std", "perf"] } # don't need Unicode support
-reqwest = { version = "0.11", features = ["json"] }
-serde = { version = "1.0", features = ["derive"] }
-thiserror = "1.0"
-tokio = { version = "1", default-features = false }
-wavesexchange_apis = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_apis/0.1.23" }
-wavesexchange_loaders = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_loaders/0.2.1" }
-wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
+async-trait.workspace = true
+diesel.workspace = true
+diesel-async.workspace = true
+lazy-regex.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+wavesexchange_apis.workspace = true
+wavesexchange_loaders.workspace = true
+wavesexchange_log.workspace = true
 
 # Local deps
 database.workspace = true

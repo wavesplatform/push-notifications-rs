@@ -4,11 +4,11 @@ version = "0.0.0"
 edition.workspace = true
 
 [dependencies]
-chrono = { version = "0.4", default-features = false, features = ["std"] }
-reqwest = { version = "0.11", features = ["json"] }
-serde = { version = "1.0", features = ["derive"] }
-thiserror = "1.0"
-waves-rust = ">=0.2.3"
+chrono.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+waves-rust.workspace = true
 
 [dev-dependencies]
-serde_json = "1.0"
+serde_json.workspace = true
