@@ -525,24 +525,16 @@ dependencies = [
 name = "database"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "diesel",
  "diesel-async",
+ "diesel_migrations",
  "envy",
  "model",
  "serde",
  "serde_json",
  "thiserror",
-]
-
-[[package]]
-name = "database-migration"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "database",
- "diesel",
- "diesel_migrations",
 ]
 
 [[package]]

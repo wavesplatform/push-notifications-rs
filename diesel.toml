@@ -6,4 +6,4 @@ file = "crates/database/src/lib/schema.rs"
 with_docs = false
 
 [migrations_directory]
-dir = "crates/database-migration/migrations"
+dir = "crates/database/migrations"
