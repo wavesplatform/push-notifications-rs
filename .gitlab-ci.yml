@@ -11,7 +11,7 @@ include:
 
 variables:
   APP_NAME: push-notifications
-  CHART_LIST: "push-notifications-api push-notifications-processor push-notifications-sender"
+  CHART_LIST: "push-notifications-api push-notifications-processor-orders push-notifications-processor-prices push-notifications-sender"
   DB_NAME: push_notifications_rs
   MIGRATION_INIT_CMD: /app/migrate init
   MIGRATION_UP_CMD: /app/migration up
