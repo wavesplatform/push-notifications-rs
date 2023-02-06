@@ -7,13 +7,13 @@ RUN apt-get update && apt-get install -y protobuf-compiler
 COPY Cargo.* ./
 COPY ./crates ./crates
 
-RUN cargo test -j4 --workspace
-RUN cargo build -j4 --workspace --release
-RUN cargo install -j4 --path ./crates/database
-RUN cargo install -j4 --path ./crates/push-notifications-api
-RUN cargo install -j4 --path ./crates/push-notifications-processor-orders
-RUN cargo install -j4 --path ./crates/push-notifications-processor-prices
-RUN cargo install -j4 --path ./crates/push-notifications-sender
+RUN cargo test -j$(nproc) --workspace
+RUN cargo build -j$(nproc) --workspace --release
+RUN cargo install -j$(nproc) --path ./crates/database
+RUN cargo install -j$(nproc) --path ./crates/push-notifications-api
+RUN cargo install -j$(nproc) --path ./crates/push-notifications-processor-orders
+RUN cargo install -j$(nproc) --path ./crates/push-notifications-processor-prices
+RUN cargo install -j$(nproc) --path ./crates/push-notifications-sender
 
 
 FROM debian:11 as runtime
