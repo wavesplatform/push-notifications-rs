@@ -3,9 +3,9 @@ use crate::error::Error;
 use database::{device, subscription};
 use model::waves::Address;
 use std::sync::Arc;
-use warp::{Filter, Rejection};
+use warp::{http, Filter, Rejection};
 use wavesexchange_warp::{
-    error::{error_handler_with_serde_qs, handler, internal, validation},
+    error::{error_handler_with_serde_qs, handler, internal, validation, Response},
     log::access,
     MetricsWarpBuilder,
 };
@@ -19,6 +19,7 @@ pub async fn start(
     metrics_port: u16,
     devices: device::Repo,
     subscriptions: subscription::Repo,
+    subscribe_config: subscription::SubscribeConfig,
     pool: PgAsyncPool,
 ) {
     let error_handler = handler(ERROR_CODES_PREFIX, |err| match err {
@@ -26,11 +27,21 @@ pub async fn start(
             log::error!(e);
             validation::invalid_parameter(ERROR_CODES_PREFIX, None)
         }
+        Error::DatabaseError(e @ database::error::Error::LimitExceeded(_, _)) => {
+            log::debug!("{}", e);
+            Response::singleton(
+                http::StatusCode::BAD_REQUEST,
+                "Too many subscriptions",
+                ERROR_CODES_PREFIX as u32 * 10000 + 901,
+                None,
+            )
+        }
         _ => internal(ERROR_CODES_PREFIX),
     });
 
     let with_devices = warp::any().map(move || devices.clone());
     let with_subscriptions = warp::any().map(move || subscriptions.clone());
+    let with_subscribe_config = warp::any().map(move || subscribe_config.clone());
 
     let with_pool = {
         let pool = Arc::new(pool);
@@ -82,6 +93,7 @@ pub async fn start(
         .and(warp::path!("topics"))
         .and(user_addr)
         .and(with_subscriptions.clone())
+        .and(with_subscribe_config.clone())
         .and(with_pool.clone())
         .and(warp::body::json::<dto::Topics>())
         .and_then(controllers::subscribe_to_topics);
@@ -253,6 +265,7 @@ mod controllers {
     pub async fn subscribe_to_topics(
         address: Address,
         subscriptions: subscription::Repo,
+        subscribe_config: subscription::SubscribeConfig,
         pool: Pool,
         topics: dto::Topics,
     ) -> Result<StatusCode, Rejection> {
@@ -276,7 +289,9 @@ mod controllers {
             .transaction(|conn| {
                 async move {
                     // All work only within db transaction
-                    subscriptions.subscribe(&address, subs, conn).await
+                    subscriptions
+                        .subscribe(&address, subs, &subscribe_config, conn)
+                        .await
                 }
                 .scope_boxed()
             })

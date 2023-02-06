@@ -52,7 +52,10 @@
 
 ### API
 
-Only [common](###Common)
+| Env variable                           | Required | Default | Note                                                        |
+|----------------------------------------| -------- |---------|-------------------------------------------------------------|
+| MAX_SUBSCRIPTIONS_PER_ADDRESS_PER_PAIR | NO       | 10      | Maximum number of price subscriptions per pair, per address |
+| MAX_SUBSCRIPTIONS_PER_ADDRESS_TOTAL    | NO       | 50      | Maximum number of price subscriptions in total, per address |
 
 
 ### Sender

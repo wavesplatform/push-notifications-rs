@@ -32,6 +32,12 @@ pub struct SubscriptionRequest {
     pub mode: SubscriptionMode,
 }
 
+#[derive(Clone, Debug)]
+pub struct SubscribeConfig {
+    pub max_subscriptions_per_address_per_pair: u32,
+    pub max_subscriptions_per_address_total: u32,
+}
+
 #[derive(Clone)]
 pub struct Repo {}
 
@@ -157,6 +163,7 @@ impl Repo {
         &self,
         address: &Address,
         subscriptions: Vec<SubscriptionRequest>,
+        config: &SubscribeConfig,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         let existing_topics: HashSet<String> = HashSet::from_iter(
@@ -166,6 +173,16 @@ impl Repo {
                 .get_results::<String>(conn)
                 .await?,
         );
+
+        let new_subs_count = existing_topics.len() + subscriptions.len();
+        let max_subs_count = config.max_subscriptions_per_address_total as usize;
+        if new_subs_count > max_subs_count {
+            return Err(Error::LimitExceeded(
+                address.to_owned(),
+                config.max_subscriptions_per_address_total,
+            ));
+        }
+        //TODO implement per-pair check
 
         let filtered_subscriptions = subscriptions
             .iter()
