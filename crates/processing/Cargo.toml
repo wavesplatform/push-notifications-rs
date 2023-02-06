@@ -1,0 +1,21 @@
+[package]
+name = "processing"
+version = "0.0.0"
+edition.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+diesel.workspace = true
+diesel-async.workspace = true
+lazy-regex.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+wavesexchange_apis.workspace = true
+wavesexchange_loaders.workspace = true
+wavesexchange_log.workspace = true
+
+# Local deps
+database.workspace = true
+model.workspace = true

@@ -312,9 +312,9 @@ checksum = "3a4f925191b4367301851c6d99b09890311d74b0d43f274c0b34c86d308a3663"
 
 [[package]]
 name = "cc"
-version = "1.0.78"
+version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a20104e2335ce8a659d6dd92a51a767a0c062599c73b343fd152cb401e828c3d"
+checksum = "50d30906286121d95be3d479533b458f87493b30a4b5f79a607db8f5d11aa91f"
 
 [[package]]
 name = "cfg-if"
@@ -444,9 +444,9 @@ dependencies = [
 
 [[package]]
 name = "cxx"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b61a7545f753a88bcbe0a70de1fcc0221e10bfc752f576754fa91e663db1622e"
+checksum = "322296e2f2e5af4270b54df9e85a02ff037e271af20ba3e7fe1575515dc840b8"
 dependencies = [
  "cc",
  "cxxbridge-flags",
@@ -456,9 +456,9 @@ dependencies = [
 
 [[package]]
 name = "cxx-build"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f464457d494b5ed6905c63b0c4704842aba319084a0a3561cdc1359536b53200"
+checksum = "017a1385b05d631e7875b1f151c9f012d37b53491e2a87f65bff5c262b2111d8"
 dependencies = [
  "cc",
  "codespan-reporting",
@@ -471,15 +471,15 @@ dependencies = [
 
 [[package]]
 name = "cxxbridge-flags"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43c7119ce3a3701ed81aca8410b9acf6fc399d2629d057b87e2efa4e63a3aaea"
+checksum = "c26bbb078acf09bc1ecda02d4223f03bdd28bd4874edcb0379138efc499ce971"
 
 [[package]]
 name = "cxxbridge-macro"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65e07508b90551e610910fa648a1878991d367064997a596135b86df30daf07e"
+checksum = "357f40d1f06a24b60ae1fe122542c1fb05d28d32acb2aed064e84bc2ad1e252e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -519,6 +519,22 @@ dependencies = [
  "darling_core",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "database"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "diesel",
+ "diesel-async",
+ "diesel_migrations",
+ "envy",
+ "model",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -649,9 +665,9 @@ dependencies = [
 
 [[package]]
 name = "either"
-version = "1.8.0"
+version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90e5c1c8368803113bf0c9584fc495a58b86dc8a29edbf8fe877d21d9507e797"
+checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
 
 [[package]]
 name = "encoding_rs"
@@ -1325,6 +1341,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "model"
+version = "0.0.0"
+dependencies = [
+ "chrono",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "waves-rust",
+]
+
+[[package]]
 name = "multimap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1655,6 +1683,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "processing"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "database",
+ "diesel",
+ "diesel-async",
+ "lazy-regex",
+ "model",
+ "reqwest",
+ "serde",
+ "thiserror",
+ "tokio",
+ "wavesexchange_apis",
+ "wavesexchange_loaders",
+ "wavesexchange_log",
+]
+
+[[package]]
 name = "procfs"
 version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1755,35 +1802,77 @@ dependencies = [
 ]
 
 [[package]]
-name = "push-notifications-rs"
+name = "push-notifications-api"
 version = "2.0.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "bb8",
- "bigdecimal",
- "bs58",
- "chrono",
+ "database",
  "diesel",
  "diesel-async",
- "diesel_migrations",
  "envy",
- "fcm",
- "itertools",
- "lazy-regex",
- "redis",
- "reqwest",
+ "model",
  "serde",
- "serde_json",
  "thiserror",
  "tokio",
  "warp",
- "waves-protobuf-schemas",
- "waves-rust",
- "wavesexchange_apis",
- "wavesexchange_loaders",
  "wavesexchange_log",
  "wavesexchange_warp",
+]
+
+[[package]]
+name = "push-notifications-processor-orders"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
+ "bigdecimal",
+ "database",
+ "diesel-async",
+ "envy",
+ "model",
+ "processing",
+ "redis",
+ "serde",
+ "serde_json",
+ "tokio",
+ "wavesexchange_log",
+ "wavesexchange_warp",
+]
+
+[[package]]
+name = "push-notifications-processor-prices"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
+ "bs58",
+ "database",
+ "diesel-async",
+ "envy",
+ "model",
+ "processing",
+ "serde",
+ "thiserror",
+ "tokio",
+ "waves-protobuf-schemas",
+ "wavesexchange_apis",
+ "wavesexchange_log",
+ "wavesexchange_warp",
+]
+
+[[package]]
+name = "push-notifications-sender"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "database",
+ "diesel",
+ "envy",
+ "fcm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "wavesexchange_log",
 ]
 
 [[package]]
@@ -2054,9 +2143,9 @@ checksum = "ddccb15bcce173023b3fedd9436f882a0739b8dfb45e4f6b6002bee5929f61b2"
 
 [[package]]
 name = "security-framework"
-version = "2.8.1"
+version = "2.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c4437699b6d34972de58652c68b98cb5b53a4199ab126db8e20ec8ded29a721"
+checksum = "a332be01508d814fed64bf28f798a146d73792121129962fdf335bb3c49a4254"
 dependencies = [
  "bitflags",
  "core-foundation",
@@ -2499,9 +2588,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.24.2"
+version = "1.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "597a12a59981d9e3c38d216785b0c37399f6e415e8d0712047620f189371b0bb"
+checksum = "c8e00990ebabbe4c14c08aca901caed183ecd5c09562a12c824bb53d3c3fd3af"
 dependencies = [
  "autocfg",
  "bytes",

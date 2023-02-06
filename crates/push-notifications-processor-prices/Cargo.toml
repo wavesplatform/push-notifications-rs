@@ -1,0 +1,26 @@
+[package]
+name = "push-notifications-processor-prices"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bs58.workspace = true
+diesel-async.workspace = true
+envy.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+waves-protobuf-schemas.workspace = true
+wavesexchange_apis.workspace = true
+wavesexchange_log.workspace = true
+wavesexchange_warp.workspace = true
+
+# Local deps
+database.workspace = true
+model.workspace = true
+processing.workspace = true
+
+[[bin]]
+name = "processor-prices"
+path = "src/main.rs"

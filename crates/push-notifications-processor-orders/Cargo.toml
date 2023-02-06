@@ -1,0 +1,25 @@
+[package]
+name = "push-notifications-processor-orders"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bigdecimal.workspace = true
+diesel-async.workspace = true
+envy.workspace = true
+redis.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+wavesexchange_log.workspace = true
+wavesexchange_warp.workspace = true
+
+# Local deps
+database.workspace = true
+model.workspace = true
+processing.workspace = true
+
+[[bin]]
+name = "processor-orders"
+path = "src/main.rs"
