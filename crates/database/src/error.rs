@@ -9,6 +9,9 @@ pub enum Error {
     #[error("Database query returned a bad address: {0}")]
     BadAddress(String),
 
+    #[error("Database query returned a bad asset: {0}")]
+    BadAsset(String),
+
     #[error("Subscriptions limit ({1}) exceeded for address {0:?}")]
     LimitExceeded(Address, u32),
 }

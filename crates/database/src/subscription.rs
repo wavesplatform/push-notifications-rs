@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
-use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl};
+use diesel::{ExpressionMethods, JoinOnDsl, NullableExpressionMethods, QueryDsl, Queryable};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use model::{
-    asset::AssetPair,
+    asset::{Asset, AssetPair},
     event::Event,
     price::PriceRange,
     topic::{SubscriptionMode, Topic},
@@ -313,16 +313,72 @@ impl Repo {
         Ok(())
     }
 
-    pub async fn get_topics_by_address(
+    pub async fn subscriptions_by_address(
         &self,
-        addr: &Address,
+        address: &Address,
         conn: &mut AsyncPgConnection,
-    ) -> Result<Vec<String>, Error> {
-        subscriptions::table
-            .select(subscriptions::topic)
-            .filter(subscriptions::subscriber_address.eq(addr.as_base58_string()))
-            .get_results(conn)
-            .await
-            .map_err(Error::from)
+    ) -> Result<Vec<(Topic, SubscriptionMode)>, Error> {
+        let address = address.as_base58_string();
+
+        let query = subscriptions::table
+            .left_outer_join(
+                topics_order_execution::table
+                    .on(topics_order_execution::subscription_uid.eq(subscriptions::uid)),
+            )
+            .left_outer_join(
+                topics_price_threshold::table
+                    .on(topics_price_threshold::subscription_uid.eq(subscriptions::uid)),
+            )
+            .select((
+                subscriptions::topic_type,
+                topics_order_execution::subscription_uid.nullable(),
+                topics_price_threshold::subscription_uid.nullable(),
+                topics_price_threshold::amount_asset_id.nullable(),
+                topics_price_threshold::price_asset_id.nullable(),
+                topics_price_threshold::price_threshold.nullable(),
+            ))
+            .filter(subscriptions::subscriber_address.eq(address))
+            .order(subscriptions::uid);
+
+        #[derive(Queryable)]
+        struct Subscription {
+            topic_type: i32,
+            order_subscription_uid: Option<i32>,
+            price_subscription_uid: Option<i32>,
+            amount_asset_id: Option<String>,
+            price_asset_id: Option<String>,
+            price_threshold: Option<f64>,
+        }
+
+        let rows = query.load::<Subscription>(conn).await?;
+
+        let res = rows
+            .into_iter()
+            .map(|row| {
+                let topic = {
+                    if row.order_subscription_uid.is_some() {
+                        Topic::OrderFulfilled
+                    } else if row.price_subscription_uid.is_some() {
+                        let parse_asset =
+                            |id: String| Asset::from_id(&id).map_err(|()| Error::BadAsset(id));
+                        // Unwraps below are safe because of the check `price_subscription_uid.is_some()`
+                        // If it fails - database JOIN query is broken
+                        Topic::PriceThreshold {
+                            amount_asset: parse_asset(row.amount_asset_id.unwrap())?,
+                            price_asset: parse_asset(row.price_asset_id.unwrap())?,
+                            price_threshold: row.price_threshold.unwrap(),
+                        }
+                    } else {
+                        unreachable!("broken JOIN");
+                    }
+                };
+
+                let mode = SubscriptionMode::from_int(row.topic_type as u8);
+
+                Ok((topic, mode))
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+
+        Ok(res)
     }
 }

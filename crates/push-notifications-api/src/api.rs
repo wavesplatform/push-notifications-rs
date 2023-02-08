@@ -306,19 +306,24 @@ mod controllers {
         subscriptions: subscription::Repo,
         pool: Pool,
     ) -> Result<Json, Rejection> {
-        let topics = pool
+        let subscriptions = pool
             .get()
             .await
             .map_err(Error::from)?
             .transaction(|conn| {
                 async move {
                     // All work only within db transaction
-                    subscriptions.get_topics_by_address(&address, conn).await
+                    subscriptions.subscriptions_by_address(&address, conn).await
                 }
                 .scope_boxed()
             })
             .await
             .map_err(|e| Error::from(e))?;
+
+        let topics = subscriptions
+            .into_iter()
+            .map(|(topic, mode)| Topic::as_url_string(&topic, mode))
+            .collect();
 
         Ok(warp::reply::json(&dto::Topics { topics }))
     }
