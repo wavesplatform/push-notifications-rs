@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
-use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl, TextExpressionMethods};
+use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use model::{
@@ -13,7 +13,7 @@ use model::{
 
 use crate::{
     error::Error,
-    schema::{subscribers, subscriptions, topics_price_threshold},
+    schema::{subscribers, subscriptions, topics_order_execution, topics_price_threshold},
 };
 
 #[derive(Debug)]
@@ -72,7 +72,11 @@ impl Repo {
         address: &Address,
         conn: &mut AsyncPgConnection,
     ) -> Result<Vec<Subscription>, Error> {
-        let rows = subscriptions::table
+        let rows = topics_order_execution::table
+            .inner_join(
+                subscriptions::table
+                    .on(topics_order_execution::subscription_uid.eq(subscriptions::uid)),
+            )
             .select((
                 subscriptions::uid,
                 subscriptions::subscriber_address,
@@ -81,7 +85,6 @@ impl Repo {
                 subscriptions::topic,
             ))
             .filter(subscriptions::subscriber_address.eq(address.as_base58_string()))
-            .filter(subscriptions::topic.like("push://orders%"))
             .order(subscriptions::uid)
             .load::<(i32, String, DateTime<Utc>, i32, String)>(conn)
             .await?;

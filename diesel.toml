@@ -2,7 +2,7 @@
 # see https://diesel.rs/guides/configuring-diesel-cli
 
 [print_schema]
-file = "crates/database/src/lib/schema.rs"
+file = "crates/database/src/schema.rs"
 with_docs = false
 
 [migrations_directory]

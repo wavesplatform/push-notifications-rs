@@ -47,6 +47,12 @@ diesel::table! {
 }
 
 diesel::table! {
+    topics_order_execution (subscription_uid) {
+        subscription_uid -> Int4,
+    }
+}
+
+diesel::table! {
     topics_price_threshold (subscription_uid) {
         subscription_uid -> Int4,
         amount_asset_id -> Varchar,
@@ -63,5 +69,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     messages,
     subscribers,
     subscriptions,
+    topics_order_execution,
     topics_price_threshold,
 );
