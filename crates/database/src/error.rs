@@ -6,8 +6,8 @@ pub enum Error {
     #[error("Database query error: {0}")]
     QueryError(#[from] diesel::result::Error),
 
-    #[error("Database query returned a malformed topic: {0}")]
-    BadTopic(#[from] model::topic::TopicError),
+    #[error("Database query returned a bad address: {0}")]
+    BadAddress(String),
 
     #[error("Subscriptions limit ({1}) exceeded for address {0:?}")]
     LimitExceeded(Address, u32),

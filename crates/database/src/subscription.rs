@@ -5,6 +5,7 @@ use diesel::{ExpressionMethods, JoinOnDsl, QueryDsl};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 use model::{
+    asset::AssetPair,
     event::Event,
     price::PriceRange,
     topic::{SubscriptionMode, Topic},
@@ -56,13 +57,8 @@ impl Repo {
                 price_range,
                 ..
             } => {
-                self.matching_price_subscriptions(
-                    asset_pair.amount_asset.id(),
-                    asset_pair.price_asset.id(),
-                    price_range,
-                    conn,
-                )
-                .await
+                self.matching_price_subscriptions(asset_pair, price_range, conn)
+                    .await
             }
         }
     }
@@ -79,24 +75,22 @@ impl Repo {
             )
             .select((
                 subscriptions::uid,
-                subscriptions::subscriber_address,
                 subscriptions::created_at,
                 subscriptions::topic_type,
-                subscriptions::topic,
             ))
             .filter(subscriptions::subscriber_address.eq(address.as_base58_string()))
             .order(subscriptions::uid)
-            .load::<(i32, String, DateTime<Utc>, i32, String)>(conn)
+            .load::<(i32, DateTime<Utc>, i32)>(conn)
             .await?;
 
         rows.into_iter()
-            .map(|(uid, address, created_at, topic_type, topic)| {
+            .map(|(uid, created_at, topic_type)| {
                 Ok(Subscription {
                     uid,
-                    subscriber: Address::from_string(&address).expect("address in db"),
+                    subscriber: address.to_owned(),
                     created_at,
                     mode: SubscriptionMode::from_int(topic_type as u8),
-                    topic: Topic::from_url_string(&topic)?.0,
+                    topic: Topic::OrderFulfilled,
                 })
             })
             .collect()
@@ -104,8 +98,7 @@ impl Repo {
 
     async fn matching_price_subscriptions(
         &self,
-        amount_asset_id: String,
-        price_asset_id: String,
+        asset_pair: &AssetPair,
         price_range: &PriceRange,
         conn: &mut AsyncPgConnection,
     ) -> Result<Vec<Subscription>, Error> {
@@ -120,29 +113,34 @@ impl Repo {
                 subscriptions::subscriber_address,
                 subscriptions::created_at,
                 subscriptions::topic_type,
-                subscriptions::topic,
                 topics_price_threshold::price_threshold,
             ))
-            .filter(topics_price_threshold::amount_asset_id.eq(amount_asset_id))
-            .filter(topics_price_threshold::price_asset_id.eq(price_asset_id))
+            .filter(topics_price_threshold::amount_asset_id.eq(asset_pair.amount_asset.id()))
+            .filter(topics_price_threshold::price_asset_id.eq(asset_pair.price_asset.id()))
             .filter(topics_price_threshold::price_threshold.between(price_low, price_high))
             .order(subscriptions::uid)
-            .load::<(i32, String, DateTime<Utc>, i32, String, f64)>(conn)
+            .load::<(i32, String, DateTime<Utc>, i32, f64)>(conn)
             .await?;
 
         rows.into_iter()
-            .filter(|&(_, _, _, _, _, threshold)| {
+            .filter(|&(_, _, _, _, threshold)| {
                 // Since we've used simple BETWEEN filter in SQL query,
                 // there can be extra rows that we need to filter properly.
                 price_range.contains(threshold)
             })
-            .map(|(uid, address, created_at, topic_type, topic, _)| {
+            .map(|(uid, address, created_at, topic_type, price_threshold)| {
+                let address =
+                    Address::from_string(&address).map_err(|_| Error::BadAddress(address))?;
                 Ok(Subscription {
                     uid,
-                    subscriber: Address::from_string(&address).expect("address in db"),
+                    subscriber: address,
                     created_at,
                     mode: SubscriptionMode::from_int(topic_type as u8),
-                    topic: Topic::from_url_string(&topic)?.0,
+                    topic: Topic::PriceThreshold {
+                        amount_asset: asset_pair.amount_asset.clone(),
+                        price_asset: asset_pair.price_asset.clone(),
+                        price_threshold,
+                    },
                 })
             })
             .collect()
