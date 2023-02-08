@@ -39,23 +39,6 @@ pub enum TopicError {
     InvalidThreshold,
 }
 
-impl SubscriptionMode {
-    pub fn from_int(mode: u8) -> Self {
-        match mode {
-            0 => Self::Once,
-            1 => Self::Repeat,
-            _ => panic!("unknown subscription mode {mode}"),
-        }
-    }
-
-    pub fn to_int(&self) -> u8 {
-        match self {
-            SubscriptionMode::Once => 0,
-            SubscriptionMode::Repeat => 1,
-        }
-    }
-}
-
 impl Topic {
     pub fn from_url_string(topic_url_raw: &str) -> Result<(Self, SubscriptionMode), TopicError> {
         enum TopicKind {

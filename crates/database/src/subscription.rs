@@ -89,7 +89,7 @@ impl Repo {
                     uid,
                     subscriber: address.to_owned(),
                     created_at,
-                    mode: SubscriptionMode::from_int(topic_type as u8),
+                    mode: topic_type_from_int(topic_type)?,
                     topic: Topic::OrderFulfilled,
                 })
             })
@@ -135,7 +135,7 @@ impl Repo {
                     uid,
                     subscriber: address,
                     created_at,
-                    mode: SubscriptionMode::from_int(topic_type as u8),
+                    mode: topic_type_from_int(topic_type)?,
                     topic: Topic::PriceThreshold {
                         amount_asset: asset_pair.amount_asset.clone(),
                         price_asset: asset_pair.price_asset.clone(),
@@ -224,7 +224,7 @@ impl Repo {
                 (
                     subscriptions::subscriber_address.eq(address.as_base58_string()),
                     subscriptions::topic.eq(subscr.topic_url.clone()),
-                    subscriptions::topic_type.eq(subscr.mode.to_int() as i32),
+                    subscriptions::topic_type.eq(topic_type_to_int(subscr.mode)),
                 )
             })
             .collect::<Vec<_>>();
@@ -373,7 +373,7 @@ impl Repo {
                     }
                 };
 
-                let mode = SubscriptionMode::from_int(row.topic_type as u8);
+                let mode = topic_type_from_int(row.topic_type)?;
 
                 Ok((topic, mode))
             })
@@ -381,4 +381,30 @@ impl Repo {
 
         Ok(res)
     }
+}
+
+fn topic_type_from_int(mode: i32) -> Result<SubscriptionMode, Error> {
+    match mode {
+        0 => Ok(SubscriptionMode::Once),
+        1 => Ok(SubscriptionMode::Repeat),
+        _ => Err(Error::BadTopicType(mode)),
+    }
+}
+
+pub fn topic_type_to_int(mode: SubscriptionMode) -> i32 {
+    match mode {
+        SubscriptionMode::Once => 0,
+        SubscriptionMode::Repeat => 1,
+    }
+}
+
+#[test]
+fn test_topic_type_to_from_int() {
+    let check = |m: i32| {
+        let mode = topic_type_from_int(m).expect("bad mode");
+        let out = topic_type_to_int(mode);
+        assert_eq!(m, out, "failed for mode {:?}", mode);
+    };
+    check(0);
+    check(1);
 }
