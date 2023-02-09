@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use diesel::{
@@ -6,7 +6,7 @@ use diesel::{
     QueryDsl, Queryable,
 };
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 use model::{
     asset::{Asset, AssetPair},
@@ -32,6 +32,7 @@ pub struct Subscription {
 
 #[derive(Debug)]
 pub struct SubscriptionRequest {
+    /// This field (and the corresponding database column) is not used anymore and can be safely deleted
     pub topic_url: String,
     pub topic: Topic,
     pub mode: SubscriptionMode,
@@ -171,15 +172,9 @@ impl Repo {
         config: &SubscribeConfig,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
-        let existing_topics: HashSet<String> = HashSet::from_iter(
-            subscriptions::table
-                .select(subscriptions::topic)
-                .filter(subscriptions::subscriber_address.eq(address.as_base58_string()))
-                .get_results::<String>(conn)
-                .await?,
-        );
+        let existing_subscriptions = self.subscriptions(address, conn).await?;
 
-        let new_subs_count = existing_topics.len() + subscriptions.len();
+        let new_subs_count = existing_subscriptions.len() + subscriptions.len();
         let max_subs_count = config.max_subscriptions_per_address_total as usize;
         if new_subs_count > max_subs_count {
             return Err(Error::LimitExceeded(
@@ -189,91 +184,105 @@ impl Repo {
         }
         //TODO implement per-pair check
 
-        let filtered_subscriptions = subscriptions
-            .iter()
-            .filter(|subscr| !existing_topics.contains(&subscr.topic_url));
+        let existing = HashMap::<Topic, (SubscriptionMode, i32)>::from_iter(
+            existing_subscriptions
+                .into_iter()
+                .map(|(uid, topic, mode)| (topic, (mode, uid))),
+        );
 
-        //TODO The following fragment definitely contains a logical error and must be rewritten:
-        // It attempts to zip HashMap (with undefined order of elements) with other collection,
-        // which will result in mixed up pairs of topic url & subscription.
+        // We need to split the subscriptions into two categories:
+        //  1. Those that exists in database but with different subscription mode (need to update them).
+        //  2. Not existing in the database (need to add them).
+        // Those existing in database with the same subscription mode can be safely ignored.
+        let (to_update, to_add) = subscriptions
+            .into_iter()
+            .filter(|sub| existing.get(&sub.topic).copied().map(|(mode, _)| mode) != Some(sub.mode))
+            .partition_map::<Vec<_>, Vec<_>, _, _, _>(|sub| match existing.get(&sub.topic) {
+                Some(&(_, uid)) => Either::Left((uid, sub)),
+                None => Either::Right(sub),
+            });
 
-        // if db contains "topic_name" topic and the request has "topic_name?oneshot",
-        // remove old topic from subscriptions and topics_price_threshold tables and insert the new one
-        let subscriptions_to_update_sub_mode = existing_topics
-            .iter()
-            .map(|topic_url| {
-                let (topic, sub_mode) =
-                    Topic::from_url_string(&topic_url).expect("broken topic url"); //TODO don't unwrap, convert and propagate this error
-                (topic_url, topic, sub_mode)
-            })
-            .zip(filtered_subscriptions.clone())
-            .filter(|((_, topic, sub_mode), sub_req)| {
-                *topic == sub_req.topic && *sub_mode != sub_req.mode
-            })
-            .map(|((topic_url, ..), _)| topic_url.as_ref())
-            .collect::<Vec<&str>>();
-
-        if !subscriptions_to_update_sub_mode.is_empty() {
-            diesel::delete(
-                subscriptions::table
-                    .filter(subscriptions::topic.eq_any(subscriptions_to_update_sub_mode)),
-            )
-            .execute(conn)
-            .await?;
-        }
-
-        let subscriptions_rows = filtered_subscriptions
-            .clone()
-            .map(|subscr| {
-                (
-                    subscriptions::subscriber_address.eq(address.as_base58_string()),
-                    subscriptions::topic.eq(subscr.topic_url.clone()),
-                    subscriptions::topic_type.eq(topic_type_to_int(subscr.mode)),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        diesel::insert_into(subscribers::table)
-            .values(subscribers::address.eq(address.as_base58_string()))
-            .on_conflict_do_nothing()
-            .execute(conn)
-            .await?;
-
-        let uids = diesel::insert_into(subscriptions::table)
-            .values(subscriptions_rows)
-            .returning(subscriptions::uid)
-            .get_results::<i32>(conn)
-            .await?;
-
-        let subscr_with_uids = filtered_subscriptions.zip(uids.into_iter());
-
-        let new_price_threshold_topics = subscr_with_uids
-            .filter(|&(subscr, _uid)| matches!(subscr.topic, Topic::PriceThreshold { .. }))
-            .map(|(subscr, uid)| {
-                if let Topic::PriceThreshold {
-                    amount_asset,
-                    price_asset,
-                    price_threshold,
-                } = &subscr.topic
-                {
-                    (
-                        topics_price_threshold::subscription_uid.eq(uid),
-                        topics_price_threshold::amount_asset_id.eq(amount_asset.id()),
-                        topics_price_threshold::price_asset_id.eq(price_asset.id()),
-                        topics_price_threshold::price_threshold.eq(price_threshold),
-                    )
-                } else {
-                    unreachable!("broken filter by topic type")
-                }
-            })
-            .collect::<Vec<_>>();
-
-        if new_price_threshold_topics.len() > 0 {
-            diesel::insert_into(topics_price_threshold::table)
-                .values(new_price_threshold_topics)
+        for (uid, sub) in to_update {
+            log::debug!("Updating for {:?}: {:?}", address, sub);
+            let count = diesel::update(subscriptions::table.filter(subscriptions::uid.eq(uid)))
+                .set(subscriptions::topic_type.eq(topic_type_to_int(sub.mode)))
                 .execute(conn)
                 .await?;
+            log::debug!("Updated {} subscriptions for {:?}", count, address);
         }
+
+        if !to_add.is_empty() {
+            log::debug!("Creating subs for {:?}: {:?}", address, to_add);
+
+            let address = address.as_base58_string();
+
+            // Create subscriber (if missing)
+            diesel::insert_into(subscribers::table)
+                .values(subscribers::address.eq(&address))
+                .on_conflict_do_nothing()
+                .execute(conn)
+                .await?;
+
+            // Subscriptions - common data
+            let insert_rows = to_add
+                .iter()
+                .map(|sub| {
+                    (
+                        subscriptions::subscriber_address.eq(&address),
+                        subscriptions::topic.eq(&sub.topic_url),
+                        subscriptions::topic_type.eq(topic_type_to_int(sub.mode)),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let uids = diesel::insert_into(subscriptions::table)
+                .values(insert_rows)
+                .returning(subscriptions::uid)
+                .get_results::<i32>(conn)
+                .await?;
+            assert_eq!(uids.len(), to_add.len());
+
+            // Subscriptions - topic data
+            let subs = to_add.into_iter().map(|sub| sub.topic).zip(uids);
+            let (orders, prices) =
+                subs.partition_map::<Vec<_>, Vec<_>, _, _, _>(|(topic, uid)| match topic {
+                    Topic::OrderFulfilled => Either::Left((uid,)),
+                    Topic::PriceThreshold {
+                        amount_asset,
+                        price_asset,
+                        price_threshold,
+                    } => Either::Right((uid, amount_asset, price_asset, price_threshold)),
+                });
+            if !orders.is_empty() {
+                let insert_rows = orders
+                    .into_iter()
+                    .map(|(uid,)| (topics_order_execution::subscription_uid.eq(uid),))
+                    .collect::<Vec<_>>();
+
+                diesel::insert_into(topics_order_execution::table)
+                    .values(insert_rows)
+                    .execute(conn)
+                    .await?;
+            }
+            if !prices.is_empty() {
+                let insert_rows = prices
+                    .into_iter()
+                    .map(|(uid, amount_asset, price_asset, price_threshold)| {
+                        (
+                            topics_price_threshold::subscription_uid.eq(uid),
+                            topics_price_threshold::amount_asset_id.eq(amount_asset.id()),
+                            topics_price_threshold::price_asset_id.eq(price_asset.id()),
+                            topics_price_threshold::price_threshold.eq(price_threshold),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                diesel::insert_into(topics_price_threshold::table)
+                    .values(insert_rows)
+                    .execute(conn)
+                    .await?;
+            }
+        }
+
         Ok(())
     }
 
@@ -345,6 +354,20 @@ impl Repo {
         address: &Address,
         conn: &mut AsyncPgConnection,
     ) -> Result<Vec<(Topic, SubscriptionMode)>, Error> {
+        let res = self
+            .subscriptions(address, conn)
+            .await?
+            .into_iter()
+            .map(|(_, topic, mode)| (topic, mode))
+            .collect();
+        Ok(res)
+    }
+
+    async fn subscriptions(
+        &self,
+        address: &Address,
+        conn: &mut AsyncPgConnection,
+    ) -> Result<Vec<(i32, Topic, SubscriptionMode)>, Error> {
         let address = address.as_base58_string();
 
         let query = subscriptions::table
@@ -357,6 +380,7 @@ impl Repo {
                     .on(topics_price_threshold::subscription_uid.eq(subscriptions::uid)),
             )
             .select((
+                subscriptions::uid,
                 subscriptions::topic_type,
                 topics_order_execution::subscription_uid.nullable(),
                 topics_price_threshold::subscription_uid.nullable(),
@@ -369,6 +393,7 @@ impl Repo {
 
         #[derive(Queryable)]
         struct Subscription {
+            uid: i32,
             topic_type: i32,
             order_subscription_uid: Option<i32>,
             price_subscription_uid: Option<i32>,
@@ -382,6 +407,8 @@ impl Repo {
         let res = rows
             .into_iter()
             .map(|row| {
+                let uid = row.uid;
+
                 let topic = {
                     if row.order_subscription_uid.is_some() {
                         Topic::OrderFulfilled
@@ -396,14 +423,16 @@ impl Repo {
                             price_threshold: row.price_threshold.unwrap(),
                         }
                     } else {
-                        unreachable!("broken JOIN");
+                        log::warn!("Bad subscription {} (unknown type) - ignored", row.uid);
+                        return Ok(None);
                     }
                 };
 
                 let mode = topic_type_from_int(row.topic_type)?;
 
-                Ok((topic, mode))
+                Ok(Some((uid, topic, mode)))
             })
+            .filter_map(Result::transpose)
             .collect::<Result<Vec<_>, Error>>()?;
 
         Ok(res)
