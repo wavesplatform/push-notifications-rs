@@ -24,6 +24,7 @@ diesel-async = { version = "0.2", features = ["postgres", "bb8"] }
 diesel_migrations = "2"
 envy = "0.4"
 fcm = "0.9" # uses chrono with default features, which transitively uses legacy 'time' crate with security issues
+itertools = "0.10"
 lazy-regex = { version = "2", default-features = false, features = ["std", "perf"] } # don't need Unicode support
 redis = { version = "0.22", default-features = false, features = ["aio", "tokio-comp", "streams"] }
 reqwest = { version = "0.11", features = ["json"] }

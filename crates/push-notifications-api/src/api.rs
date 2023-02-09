@@ -244,15 +244,32 @@ mod controllers {
         pool: Pool,
         topics: Option<dto::Topics>,
     ) -> Result<StatusCode, Rejection> {
+        let topics = topics
+            .map(|t| {
+                t.topics
+                    .into_iter()
+                    .map(|topic_url| {
+                        // Subscription mode (`?oneshot`) is allowed but ignored here,
+                        // so that the subscriber doesn't necessarily need to know it
+                        // to be able to unsubscribe.
+                        let (topic, _) = Topic::from_url_string(&topic_url)?;
+                        Ok(topic)
+                    })
+                    .collect::<Result<Vec<_>, Error>>()
+            })
+            .transpose()?;
+
         pool.get()
             .await
             .map_err(Error::from)?
             .transaction(|conn| {
                 async move {
                     // All work only within db transaction
-                    subscriptions
-                        .unsubscribe(&address, topics.map(|t| t.topics), conn)
-                        .await
+                    if let Some(topics) = topics {
+                        subscriptions.unsubscribe(&address, topics, conn).await
+                    } else {
+                        subscriptions.unsubscribe_all(&address, conn).await
+                    }
                 }
                 .scope_boxed()
             })

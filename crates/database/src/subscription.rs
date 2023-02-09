@@ -1,8 +1,12 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
-use diesel::{ExpressionMethods, JoinOnDsl, NullableExpressionMethods, QueryDsl, Queryable};
+use diesel::{
+    dsl::sql_query, sql_types::Text, ExpressionMethods, JoinOnDsl, NullableExpressionMethods,
+    QueryDsl, Queryable,
+};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use itertools::Itertools;
 
 use model::{
     asset::{Asset, AssetPair},
@@ -276,39 +280,62 @@ impl Repo {
     pub async fn unsubscribe(
         &self,
         address: &Address,
-        topics: Option<Vec<String>>,
+        topics: Vec<Topic>,
         conn: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         let address = address.as_base58_string();
 
-        let uids_to_remove: Vec<i32> = match topics {
-            Some(topics) => {
-                subscriptions::table
-                    .select(subscriptions::uid)
-                    .filter(subscriptions::subscriber_address.eq(address))
-                    .filter(subscriptions::topic.eq_any(topics))
-                    .get_results(conn)
-                    .await?
-            }
-            None => {
-                subscriptions::table
-                    .select(subscriptions::uid)
-                    .filter(subscriptions::subscriber_address.eq(address))
-                    .get_results(conn)
-                    .await?
-            }
-        };
+        let conditions = topics
+            .into_iter()
+            .map(|t| match t {
+                Topic::OrderFulfilled => format!("(o.subscription_uid IS NOT NULL)"),
+                Topic::PriceThreshold { amount_asset, price_asset, price_threshold } => {
+                    format!(
+                        "(p.amount_asset_id = '{}' AND p.price_asset_id = '{}' AND p.price_threshold = {})",
+                        amount_asset.id(),
+                        price_asset.id(),
+                        price_threshold,
+                    )
+                }
+            })
+            .join(" OR ");
 
-        diesel::delete(
-            topics_price_threshold::table
-                .filter(topics_price_threshold::subscription_uid.eq_any(&uids_to_remove)),
+        let query = format!(
+            r#"
+                DELETE FROM subscriptions WHERE uid IN (
+                    SELECT s.uid
+                    FROM subscriptions s
+                         LEFT OUTER JOIN topics_price_threshold p ON (p.subscription_uid = s.uid)
+                         LEFT OUTER JOIN topics_order_execution o ON (o.subscription_uid = s.uid)
+                    WHERE (s.subscriber_address = '?') AND ({})
+                )
+            "#,
+            conditions
+        );
+
+        let query = sql_query(query).bind::<Text, _>(&address);
+
+        let count = query.execute(conn).await?;
+
+        log::debug!("Deleted {} subscriptions for {}", count, address);
+
+        Ok(())
+    }
+
+    pub async fn unsubscribe_all(
+        &self,
+        address: &Address,
+        conn: &mut AsyncPgConnection,
+    ) -> Result<(), Error> {
+        let address = address.as_base58_string();
+
+        let count = diesel::delete(
+            subscriptions::table.filter(subscriptions::subscriber_address.eq(&address)),
         )
         .execute(conn)
         .await?;
 
-        diesel::delete(subscriptions::table.filter(subscriptions::uid.eq_any(uids_to_remove)))
-            .execute(conn)
-            .await?;
+        log::debug!("Deleted {} subscriptions for {}", count, address);
 
         Ok(())
     }
