@@ -6,6 +6,7 @@ mod api;
 mod config;
 mod db;
 mod error;
+mod topic;
 
 use database::{device, subscription};
 

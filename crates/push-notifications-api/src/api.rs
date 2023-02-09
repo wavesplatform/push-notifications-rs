@@ -1,5 +1,4 @@
-use crate::db::PgAsyncPool;
-use crate::error::Error;
+use crate::{db::PgAsyncPool, error::Error};
 use database::{device, subscription};
 use model::waves::Address;
 use std::sync::Arc;
@@ -131,13 +130,16 @@ pub async fn start(
 
 mod controllers {
     use super::{dto, Pool};
-    use crate::error::Error;
+    use crate::{
+        error::Error,
+        topic::{build_subscription_url, parse_subscription_url},
+    };
     use database::{
         device,
         subscription::{self, SubscriptionRequest},
     };
     use diesel_async::AsyncConnection;
-    use model::{device::FcmUid, topic::Topic, waves::Address};
+    use model::{device::FcmUid, waves::Address};
     use warp::{http::StatusCode, reply::Json, Rejection};
 
     use diesel_async::scoped_futures::ScopedFutureExt as _;
@@ -252,7 +254,7 @@ mod controllers {
                         // Subscription mode (`?oneshot`) is allowed but ignored here,
                         // so that the subscriber doesn't necessarily need to know it
                         // to be able to unsubscribe.
-                        let (topic, _) = Topic::from_url_string(&topic_url)?;
+                        let (topic, _) = parse_subscription_url(&topic_url)?;
                         Ok(topic)
                     })
                     .collect::<Result<Vec<_>, Error>>()
@@ -290,7 +292,7 @@ mod controllers {
             .topics
             .into_iter()
             .map(|topic_url| {
-                let (topic, mode) = Topic::from_url_string(&topic_url)?;
+                let (topic, mode) = parse_subscription_url(&topic_url)?;
                 Ok(SubscriptionRequest {
                     topic_url, // Can be safely removed
                     topic,
@@ -338,7 +340,7 @@ mod controllers {
 
         let topics = subscriptions
             .into_iter()
-            .map(|(topic, mode)| Topic::as_url_string(&topic, mode))
+            .map(|(topic, mode)| build_subscription_url(topic, mode))
             .collect();
 
         Ok(warp::reply::json(&dto::Topics { topics }))

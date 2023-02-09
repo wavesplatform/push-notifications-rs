@@ -13,7 +13,7 @@ pub enum Error {
     AddressParseError(String),
 
     #[error("Bad topic: {0}")]
-    BadTopic(#[from] model::topic::TopicError),
+    BadTopic(#[from] crate::topic::TopicError),
 
     #[error("Database pool error: {0}")]
     PoolError(#[from] bb8::RunError<PoolError>),

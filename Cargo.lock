@@ -1347,10 +1347,8 @@ name = "model"
 version = "0.0.0"
 dependencies = [
  "chrono",
- "reqwest",
  "serde",
  "serde_json",
- "thiserror",
  "waves-rust",
 ]
 
@@ -1814,6 +1812,7 @@ dependencies = [
  "diesel-async",
  "envy",
  "model",
+ "reqwest",
  "serde",
  "thiserror",
  "tokio",
