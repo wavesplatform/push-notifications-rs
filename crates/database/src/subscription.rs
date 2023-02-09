@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use diesel::{
@@ -174,16 +174,69 @@ impl Repo {
     ) -> Result<(), Error> {
         let existing_subscriptions = self.subscriptions(address, conn).await?;
 
-        let new_subs_count = existing_subscriptions.len() + subscriptions.len();
-        let max_subs_count = config.max_subscriptions_per_address_total as usize;
-        if new_subs_count > max_subs_count {
-            return Err(Error::LimitExceeded(
-                address.to_owned(),
-                config.max_subscriptions_per_address_total,
-            ));
-        }
-        //TODO implement per-pair check
+        // Check limits
+        {
+            // Check total limit on subscriptions
+            let new_subs_count = existing_subscriptions.len() + subscriptions.len();
+            let max_subs_count = config.max_subscriptions_per_address_total as usize;
+            if new_subs_count > max_subs_count {
+                return Err(Error::LimitExceeded(
+                    address.to_owned(),
+                    config.max_subscriptions_per_address_total,
+                ));
+            }
 
+            // Check per-pair limit on price subscriptions
+            let subscriptions_per_pair = {
+                // Map of: asset pair -> set of prices
+                let mut price_subs =
+                    HashMap::<AssetPair, HashSet<_>>::with_capacity(new_subs_count);
+
+                // Topics of existing subscriptions
+                let existing_topics = existing_subscriptions
+                    .iter()
+                    .map(|&(_, ref topic, _)| topic);
+
+                // Topics of new subscriptions
+                let new_topics = subscriptions.iter().map(|sub| &sub.topic);
+
+                // Topics of all subscriptions, old and new
+                let topics = existing_topics.chain(new_topics);
+
+                // Group by asset pair, collect all unique price thresholds
+                for topic in topics {
+                    if let Topic::PriceThreshold {
+                        amount_asset,
+                        price_asset,
+                        price_threshold,
+                    } = topic
+                    {
+                        let pair = AssetPair {
+                            amount_asset: amount_asset.clone(),
+                            price_asset: price_asset.clone(),
+                        };
+                        let prices = price_subs.entry(pair).or_default();
+                        prices.insert(price_threshold.to_bits());
+                    }
+                }
+
+                price_subs
+            };
+
+            let limit = config.max_subscriptions_per_address_per_pair as usize;
+
+            if subscriptions_per_pair
+                .values()
+                .any(|prices| prices.len() > limit)
+            {
+                return Err(Error::LimitExceeded(
+                    address.to_owned(),
+                    config.max_subscriptions_per_address_per_pair,
+                ));
+            }
+        }
+
+        // Convert existing subscriptions to a map keyed by topic
         let existing = HashMap::<Topic, (SubscriptionMode, i32)>::from_iter(
             existing_subscriptions
                 .into_iter()
