@@ -19,10 +19,11 @@
 
 ### Processor (common)
 
-| Env variable           | Required | Default | Note                                       |
-|------------------------| -------- | ------- |--------------------------------------------|
-| LOKALISE_SDK_TOKEN     | YES      |         | API token from lokalise                    |
-| LOKALISE_PROJECT_ID    | YES      |         | Project ID in lokalise                     |
+| Env variable        | Required | Default                       | Note                    |
+|---------------------|----------|-------------------------------|-------------------------|
+| LOKALISE_SDK_TOKEN  | YES      |                               | API token from lokalise |
+| LOKALISE_PROJECT_ID | YES      |                               | Project ID in lokalise  |
+| LOKALISE_API_URL    | NO       | https://api.lokalise.com/api2 | Lokalise API base URL   |
 
 
 ### Processor (prices)

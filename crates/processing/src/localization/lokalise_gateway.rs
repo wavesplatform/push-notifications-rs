@@ -1,13 +1,5 @@
 use wavesexchange_apis::HttpClient;
 
-//TODO Move to config
-pub(super) const LOCALISE_API_URL: &str = "https://api.lokalise.com/api2";
-
-pub struct LokaliseConfig {
-    pub token: String,
-    pub project_id: String,
-}
-
 pub(super) struct RemoteGateway {
     lokalise_client: HttpClient<()>,
 }

@@ -5,6 +5,7 @@ use std::fmt;
 use serde::Deserialize;
 
 use model::waves::{Address, AsBase58String};
+use processing::localization::LokaliseConfig;
 
 use self::error::Error;
 
@@ -12,21 +13,19 @@ use self::error::Error;
 pub struct Config {
     pub metrics_port: u16,
     pub assets_service_url: String,
-    pub lokalise_token: String,
-    pub lokalise_project_id: String,
     pub blockchain_updates_url: String,
     pub starting_height: Option<u32>,
     pub matcher_address: Address,
     pub data_service_url: String,
+    pub lokalise: LokaliseConfig,
 }
 
 impl fmt::Debug for Config {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Intentionally avoid printing passwords for security reasons
         f.debug_struct("Config")
+            .field("metrics_port", &self.metrics_port)
             .field("assets_service_url", &self.assets_service_url)
-            .field("lokalise_token", &"****")
-            .field("lokalise_project_id", &self.lokalise_project_id)
             .field("blockchain_updates_url", &self.blockchain_updates_url)
             .field("starting_height", &self.starting_height)
             .field(
@@ -34,6 +33,7 @@ impl fmt::Debug for Config {
                 &format_args!("{}", self.matcher_address.as_base58_string()),
             )
             .field("data_service_url", &self.data_service_url)
+            .field("lokalise", &self.lokalise)
             .finish()
     }
 }
@@ -44,8 +44,6 @@ impl Config {
         let config = Config {
             metrics_port: config.metrics_port,
             assets_service_url: config.assets_service_url,
-            lokalise_token: config.lokalise_token,
-            lokalise_project_id: config.lokalise_project_id,
             blockchain_updates_url: config.blockchain_updates_url,
             starting_height: if config.starting_height != Some(0) {
                 config.starting_height
@@ -55,6 +53,7 @@ impl Config {
             matcher_address: Address::from_string(&config.matcher_address)
                 .map_err(|_| Error::BadConfigValue("matcher_address"))?,
             data_service_url: config.data_service_url,
+            lokalise: LokaliseConfig::load()?,
         };
         Ok(config)
     }
@@ -69,8 +68,6 @@ struct RawConfig {
     blockchain_updates_url: String,
     starting_height: Option<u32>,
     matcher_address: String,
-    lokalise_token: String,
-    lokalise_project_id: String,
 }
 
 fn default_metrics_port() -> u16 {
