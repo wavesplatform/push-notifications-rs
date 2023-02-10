@@ -8,34 +8,25 @@ pub enum SubscriptionMode {
     Repeat,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Topic {
     OrderFulfilled,
-    PriceThreshold {
-        amount_asset: Asset,
-        price_asset: Asset,
-        price_threshold: Price,
-    },
+    PriceThreshold(PriceThreshold),
 }
 
-impl Eq for Topic {} // Ignore the fact that Topic can contain `f64`
+#[derive(Debug, PartialEq)]
+pub struct PriceThreshold {
+    pub amount_asset: Asset,
+    pub price_asset: Asset,
+    pub price_threshold: Price,
+}
 
-impl Hash for Topic { // Has to impl Hash manually because of `f64` inside
+impl Eq for PriceThreshold {} // Ignore the fact that Topic can contain `f64`
+
+impl Hash for PriceThreshold { // Has to impl Hash manually because of `f64` inside
     fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            Topic::OrderFulfilled => {
-                state.write_u8(1);
-            }
-            Topic::PriceThreshold {
-                amount_asset,
-                price_asset,
-                price_threshold,
-            } => {
-                state.write_u8(2);
-                amount_asset.hash(state);
-                price_asset.hash(state);
-                price_threshold.to_bits().hash(state);
-            }
-        }
+        self.amount_asset.hash(state);
+        self.price_asset.hash(state);
+        self.price_threshold.to_bits().hash(state);
     }
 }

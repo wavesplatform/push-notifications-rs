@@ -12,7 +12,7 @@ use model::{
     asset::{Asset, AssetPair},
     event::Event,
     price::PriceRange,
-    topic::{SubscriptionMode, Topic},
+    topic::{PriceThreshold, SubscriptionMode, Topic},
     waves::{Address, AsBase58String},
 };
 
@@ -141,11 +141,11 @@ impl Repo {
                     subscriber: address,
                     created_at,
                     mode: topic_type_from_int(topic_type)?,
-                    topic: Topic::PriceThreshold {
+                    topic: Topic::PriceThreshold(PriceThreshold {
                         amount_asset: asset_pair.amount_asset.clone(),
                         price_asset: asset_pair.price_asset.clone(),
                         price_threshold,
-                    },
+                    }),
                 })
             })
             .collect()
@@ -205,18 +205,13 @@ impl Repo {
 
                 // Group by asset pair, collect all unique price thresholds
                 for topic in topics {
-                    if let Topic::PriceThreshold {
-                        amount_asset,
-                        price_asset,
-                        price_threshold,
-                    } = topic
-                    {
+                    if let Topic::PriceThreshold(t) = topic {
                         let pair = AssetPair {
-                            amount_asset: amount_asset.clone(),
-                            price_asset: price_asset.clone(),
+                            amount_asset: t.amount_asset.clone(),
+                            price_asset: t.price_asset.clone(),
                         };
                         let prices = price_subs.entry(pair).or_default();
-                        prices.insert(price_threshold.to_bits());
+                        prices.insert(t.price_threshold.to_bits());
                     }
                 }
 
@@ -299,11 +294,7 @@ impl Repo {
             let (orders, prices) =
                 subs.partition_map::<Vec<_>, Vec<_>, _, _, _>(|(topic, uid)| match topic {
                     Topic::OrderFulfilled => Either::Left((uid,)),
-                    Topic::PriceThreshold {
-                        amount_asset,
-                        price_asset,
-                        price_threshold,
-                    } => Either::Right((uid, amount_asset, price_asset, price_threshold)),
+                    Topic::PriceThreshold(t) => Either::Right((uid, t)),
                 });
             if !orders.is_empty() {
                 let insert_rows = orders
@@ -319,12 +310,12 @@ impl Repo {
             if !prices.is_empty() {
                 let insert_rows = prices
                     .into_iter()
-                    .map(|(uid, amount_asset, price_asset, price_threshold)| {
+                    .map(|(uid, topic)| {
                         (
                             topics_price_threshold::subscription_uid.eq(uid),
-                            topics_price_threshold::amount_asset_id.eq(amount_asset.id()),
-                            topics_price_threshold::price_asset_id.eq(price_asset.id()),
-                            topics_price_threshold::price_threshold.eq(price_threshold),
+                            topics_price_threshold::amount_asset_id.eq(topic.amount_asset.id()),
+                            topics_price_threshold::price_asset_id.eq(topic.price_asset.id()),
+                            topics_price_threshold::price_threshold.eq(topic.price_threshold),
                         )
                     })
                     .collect::<Vec<_>>();
@@ -351,12 +342,12 @@ impl Repo {
             .into_iter()
             .map(|t| match t {
                 Topic::OrderFulfilled => format!("(o.subscription_uid IS NOT NULL)"),
-                Topic::PriceThreshold { amount_asset, price_asset, price_threshold } => {
+                Topic::PriceThreshold(t) => {
                     format!(
                         "(p.amount_asset_id = '{}' AND p.price_asset_id = '{}' AND p.price_threshold = {})",
-                        amount_asset.id(),
-                        price_asset.id(),
-                        price_threshold,
+                        t.amount_asset.id(),
+                        t.price_asset.id(),
+                        t.price_threshold,
                     )
                 }
             })
@@ -470,11 +461,11 @@ impl Repo {
                             |id: String| Asset::from_id(&id).map_err(|()| Error::BadAsset(id));
                         // Unwraps below are safe because of the check `price_subscription_uid.is_some()`
                         // If it fails - database JOIN query is broken
-                        Topic::PriceThreshold {
+                        Topic::PriceThreshold(PriceThreshold {
                             amount_asset: parse_asset(row.amount_asset_id.unwrap())?,
                             price_asset: parse_asset(row.price_asset_id.unwrap())?,
                             price_threshold: row.price_threshold.unwrap(),
-                        }
+                        })
                     } else {
                         log::warn!("Bad subscription {} (unknown type) - ignored", row.uid);
                         return Ok(None);

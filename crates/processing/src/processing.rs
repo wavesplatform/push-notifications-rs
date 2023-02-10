@@ -142,20 +142,16 @@ impl MessagePump {
                     price_range,
                     timestamp,
                 },
-                Topic::PriceThreshold {
-                    amount_asset: topic_amount_asset,
-                    price_asset: topic_price_asset,
-                    price_threshold,
-                },
+                Topic::PriceThreshold(topic),
             ) => {
-                debug_assert_eq!(event_assets.amount_asset, *topic_amount_asset);
-                debug_assert_eq!(event_assets.price_asset, *topic_price_asset);
-                debug_assert!(price_range.contains(*price_threshold));
+                debug_assert_eq!(event_assets.amount_asset, topic.amount_asset);
+                debug_assert_eq!(event_assets.price_asset, topic.price_asset);
+                debug_assert!(price_range.contains(topic.price_threshold));
                 let (amount_asset, price_asset) = event_assets.assets_as_ref();
                 Message::PriceThresholdReached {
                     amount_asset_ticker: self.asset_ticker(amount_asset).await?,
                     price_asset_ticker: self.asset_ticker(price_asset).await?,
-                    threshold: *price_threshold,
+                    threshold: topic.price_threshold,
                     timestamp: *timestamp,
                 }
             }

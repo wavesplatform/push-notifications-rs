@@ -2,7 +2,7 @@
 
 use model::{
     asset::Asset,
-    topic::{SubscriptionMode, Topic},
+    topic::{PriceThreshold, SubscriptionMode, Topic},
 };
 use reqwest::Url;
 
@@ -89,11 +89,11 @@ pub fn parse_subscription_url(topic_url: &str) -> Result<(Topic, SubscriptionMod
                 .ok_or_else(|| TopicError::InvalidThreshold)
                 .and_then(|v| v.parse().map_err(|_| TopicError::InvalidThreshold))?;
 
-            Topic::PriceThreshold {
+            Topic::PriceThreshold(PriceThreshold {
                 amount_asset,
                 price_asset,
                 price_threshold,
-            }
+            })
         }
     };
 
@@ -102,13 +102,12 @@ pub fn parse_subscription_url(topic_url: &str) -> Result<(Topic, SubscriptionMod
 
 pub fn build_subscription_url(topic: Topic, mode: SubscriptionMode) -> String {
     let topic = match topic {
-        Topic::OrderFulfilled => "push://orders".to_string(),
-        Topic::PriceThreshold {
-            amount_asset,
-            price_asset,
-            price_threshold,
-        } => {
-            format!("push://price_threshold/{amount_asset}/{price_asset}/{price_threshold}")
+        Topic::OrderFulfilled => format!("push://orders"),
+        Topic::PriceThreshold(t) => {
+            format!(
+                "push://price_threshold/{}/{}/{}",
+                t.amount_asset, t.price_asset, t.price_threshold
+            )
         }
     };
 
@@ -126,7 +125,7 @@ mod tests {
     use super::{build_subscription_url, parse_subscription_url, TopicError};
     use model::{
         asset::Asset,
-        topic::{SubscriptionMode, Topic},
+        topic::{PriceThreshold, SubscriptionMode, Topic},
     };
 
     #[test]
@@ -149,39 +148,39 @@ mod tests {
             (
                 "push://price_threshold/8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc/WAVES/500.0",
                 (
-                    Topic::PriceThreshold {
+                    Topic::PriceThreshold(PriceThreshold {
                         amount_asset: Asset::from_id(
                             "8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc",
                         )
                             .unwrap(),
                         price_asset: Asset::Waves,
                         price_threshold: 500.0,
-                    },
+                    }),
                     SubscriptionMode::Repeat,
                 ),
             ),
             (
                 "push://price_threshold/WAVES/8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc/500.0?oneshot",
                 (
-                    Topic::PriceThreshold {
+                    Topic::PriceThreshold(PriceThreshold {
                         amount_asset: Asset::Waves,
                         price_asset: Asset::from_id(
                             "8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc",
                         )
                             .unwrap(),
                         price_threshold: 500.0,
-                    },
+                    }),
                     SubscriptionMode::Once,
                 ),
             ),
             (
                 "push://price_threshold/WAVES/WAVES/-10.5?LKJH=nhwqg734xn&qwe=zxc#asdqwlvkj",
                 (
-                    Topic::PriceThreshold {
+                    Topic::PriceThreshold(PriceThreshold {
                         amount_asset: Asset::Waves,
                         price_asset: Asset::Waves,
                         price_threshold: -10.5,
-                    },
+                    }),
                     SubscriptionMode::Repeat,
                 ),
             ),
@@ -222,22 +221,22 @@ mod tests {
     fn test_build_subscription_url() {
         let topics_sub_modes_urls = [
             (
-                Topic::PriceThreshold {
+                Topic::PriceThreshold(PriceThreshold {
                     amount_asset: Asset::Waves,
                     price_asset: Asset::from_id("8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc")
                         .unwrap(),
                     price_threshold: 1.7,
-                },
+                }),
                 SubscriptionMode::Repeat,
                 "push://price_threshold/WAVES/8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc/1.7",
             ),
             (
-                Topic::PriceThreshold {
+                Topic::PriceThreshold(PriceThreshold {
                     amount_asset: Asset::from_id("8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc")
                         .unwrap(),
                     price_asset: Asset::Waves,
                     price_threshold: 2.,
-                },
+                }),
                 SubscriptionMode::Once,
                 "push://price_threshold/8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc/WAVES/2?oneshot",
             ),
