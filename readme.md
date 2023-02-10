@@ -54,6 +54,7 @@
 
 | Env variable                           | Required | Default | Note                                                        |
 |----------------------------------------| -------- |---------|-------------------------------------------------------------|
+| POOL_CONNECTION_TIMEOUT_SEC            | NO       | 5       | Database pool connection timeout, seconds                   |
 | MAX_SUBSCRIPTIONS_PER_ADDRESS_PER_PAIR | NO       | 10      | Maximum number of price subscriptions per pair, per address |
 | MAX_SUBSCRIPTIONS_PER_ADDRESS_TOTAL    | NO       | 50      | Maximum number of price subscriptions in total, per address |
 

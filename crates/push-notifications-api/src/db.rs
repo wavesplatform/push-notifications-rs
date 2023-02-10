@@ -8,12 +8,15 @@ use std::time::Duration;
 
 pub type PgAsyncPool = Pool<AsyncPgConnection>;
 
-pub async fn async_pool(config: &Config) -> Result<PgAsyncPool, Error> {
+pub async fn async_pool(
+    config: &Config,
+    connection_timeout: Duration,
+) -> Result<PgAsyncPool, Error> {
     let db_url = Config::database_url(config);
     let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(db_url);
 
     let pool = Pool::builder()
-        .connection_timeout(Duration::from_secs(5))
+        .connection_timeout(connection_timeout)
         .build(config)
         .await
         .map_err(|e| Error::Generic(e.to_string()))?;
