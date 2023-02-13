@@ -1,11 +1,10 @@
-use crate::db::PgAsyncPool;
-use crate::error::Error;
+use crate::{db::PgAsyncPool, error::Error};
 use database::{device, subscription};
 use model::waves::Address;
 use std::sync::Arc;
-use warp::{Filter, Rejection};
+use warp::{http, Filter, Rejection};
 use wavesexchange_warp::{
-    error::{error_handler_with_serde_qs, handler, internal, validation},
+    error::{error_handler_with_serde_qs, handler, internal, validation, Response},
     log::access,
     MetricsWarpBuilder,
 };
@@ -19,6 +18,7 @@ pub async fn start(
     metrics_port: u16,
     devices: device::Repo,
     subscriptions: subscription::Repo,
+    subscribe_config: subscription::SubscribeConfig,
     pool: PgAsyncPool,
 ) {
     let error_handler = handler(ERROR_CODES_PREFIX, |err| match err {
@@ -26,11 +26,21 @@ pub async fn start(
             log::error!(e);
             validation::invalid_parameter(ERROR_CODES_PREFIX, None)
         }
+        Error::DatabaseError(e @ database::error::Error::LimitExceeded(_, _)) => {
+            log::debug!("{}", e);
+            Response::singleton(
+                http::StatusCode::BAD_REQUEST,
+                "Too many subscriptions",
+                ERROR_CODES_PREFIX as u32 * 10000 + 901,
+                None,
+            )
+        }
         _ => internal(ERROR_CODES_PREFIX),
     });
 
     let with_devices = warp::any().map(move || devices.clone());
     let with_subscriptions = warp::any().map(move || subscriptions.clone());
+    let with_subscribe_config = warp::any().map(move || subscribe_config.clone());
 
     let with_pool = {
         let pool = Arc::new(pool);
@@ -82,6 +92,7 @@ pub async fn start(
         .and(warp::path!("topics"))
         .and(user_addr)
         .and(with_subscriptions.clone())
+        .and(with_subscribe_config.clone())
         .and(with_pool.clone())
         .and(warp::body::json::<dto::Topics>())
         .and_then(controllers::subscribe_to_topics);
@@ -119,13 +130,16 @@ pub async fn start(
 
 mod controllers {
     use super::{dto, Pool};
-    use crate::error::Error;
+    use crate::{
+        error::Error,
+        topic::{build_subscription_url, parse_subscription_url},
+    };
     use database::{
         device,
         subscription::{self, SubscriptionRequest},
     };
     use diesel_async::AsyncConnection;
-    use model::{device::FcmUid, topic::Topic, waves::Address};
+    use model::{device::FcmUid, waves::Address};
     use warp::{http::StatusCode, reply::Json, Rejection};
 
     use diesel_async::scoped_futures::ScopedFutureExt as _;
@@ -232,15 +246,32 @@ mod controllers {
         pool: Pool,
         topics: Option<dto::Topics>,
     ) -> Result<StatusCode, Rejection> {
+        let topics = topics
+            .map(|t| {
+                t.topics
+                    .into_iter()
+                    .map(|topic_url| {
+                        // Subscription mode (`?oneshot`) is allowed but ignored here,
+                        // so that the subscriber doesn't necessarily need to know it
+                        // to be able to unsubscribe.
+                        let (topic, _) = parse_subscription_url(&topic_url)?;
+                        Ok(topic)
+                    })
+                    .collect::<Result<Vec<_>, Error>>()
+            })
+            .transpose()?;
+
         pool.get()
             .await
             .map_err(Error::from)?
             .transaction(|conn| {
                 async move {
                     // All work only within db transaction
-                    subscriptions
-                        .unsubscribe(&address, topics.map(|t| t.topics), conn)
-                        .await
+                    if let Some(topics) = topics {
+                        subscriptions.unsubscribe(&address, topics, conn).await
+                    } else {
+                        subscriptions.unsubscribe_all(&address, conn).await
+                    }
                 }
                 .scope_boxed()
             })
@@ -253,6 +284,7 @@ mod controllers {
     pub async fn subscribe_to_topics(
         address: Address,
         subscriptions: subscription::Repo,
+        subscribe_config: subscription::SubscribeConfig,
         pool: Pool,
         topics: dto::Topics,
     ) -> Result<StatusCode, Rejection> {
@@ -260,10 +292,9 @@ mod controllers {
             .topics
             .into_iter()
             .map(|topic_url| {
-                let (topic, mode) = Topic::from_url_string(&topic_url)?;
+                let (topic, mode) = parse_subscription_url(&topic_url)?;
                 Ok(SubscriptionRequest {
-                    // as_url_string removes junk from topic_url (like anchors or extra query params)
-                    topic_url: topic.as_url_string(mode),
+                    topic_url, // Can be safely removed
                     topic,
                     mode,
                 })
@@ -276,7 +307,9 @@ mod controllers {
             .transaction(|conn| {
                 async move {
                     // All work only within db transaction
-                    subscriptions.subscribe(&address, subs, conn).await
+                    subscriptions
+                        .subscribe(&address, subs, &subscribe_config, conn)
+                        .await
                 }
                 .scope_boxed()
             })
@@ -291,19 +324,24 @@ mod controllers {
         subscriptions: subscription::Repo,
         pool: Pool,
     ) -> Result<Json, Rejection> {
-        let topics = pool
+        let subscriptions = pool
             .get()
             .await
             .map_err(Error::from)?
             .transaction(|conn| {
                 async move {
                     // All work only within db transaction
-                    subscriptions.get_topics_by_address(&address, conn).await
+                    subscriptions.subscriptions_by_address(&address, conn).await
                 }
                 .scope_boxed()
             })
             .await
             .map_err(|e| Error::from(e))?;
+
+        let topics = subscriptions
+            .into_iter()
+            .map(|(topic, mode)| build_subscription_url(topic, mode))
+            .collect();
 
         Ok(warp::reply::json(&dto::Topics { topics }))
     }

@@ -5,9 +5,7 @@ edition.workspace = true
 
 [dependencies]
 chrono.workspace = true
-reqwest.workspace = true
 serde.workspace = true
-thiserror.workspace = true
 waves-rust.workspace = true
 
 [dev-dependencies]

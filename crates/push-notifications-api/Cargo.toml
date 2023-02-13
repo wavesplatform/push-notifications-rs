@@ -9,6 +9,7 @@ bb8.workspace = true
 diesel.workspace = true
 diesel-async.workspace = true
 envy.workspace = true
+reqwest.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

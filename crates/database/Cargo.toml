@@ -10,9 +10,11 @@ diesel.workspace = true
 diesel-async.workspace = true
 diesel_migrations.workspace = true
 envy.workspace = true
+itertools.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+wavesexchange_log.workspace = true
 
 # Local deps
 model.workspace = true
