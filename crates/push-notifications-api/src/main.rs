@@ -29,7 +29,6 @@ async fn main() -> Result<(), anyhow::Error> {
 
     api::start(
         config.port,
-        config.metrics_port,
         devices,
         subscriptions,
         subscribe_config,

@@ -15,7 +15,6 @@ type Pool = Arc<PgAsyncPool>;
 
 pub async fn start(
     port: u16,
-    metrics_port: u16,
     devices: device::Repo,
     subscriptions: subscription::Repo,
     subscribe_config: subscription::SubscribeConfig,
@@ -123,7 +122,7 @@ pub async fn start(
     MetricsWarpBuilder::new()
         .with_main_routes(routes)
         .with_main_routes_port(port)
-        .with_metrics_port(metrics_port)
+        .with_metrics_port_from_env()
         .run_async()
         .await;
 }

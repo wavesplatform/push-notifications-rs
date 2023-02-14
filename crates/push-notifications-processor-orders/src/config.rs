@@ -8,7 +8,6 @@ use processing::localization::LokaliseConfig;
 
 #[derive(Clone)]
 pub struct Config {
-    pub metrics_port: u16,
     pub assets_service_url: String,
     pub redis_hostname: String,
     pub redis_port: u16,
@@ -25,7 +24,6 @@ impl fmt::Debug for Config {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Intentionally avoid printing passwords for security reasons
         f.debug_struct("Config")
-            .field("metrics_port", &self.metrics_port)
             .field("assets_service_url", &self.assets_service_url)
             .field("redis_hostname", &self.redis_hostname)
             .field("redis_port", &self.redis_port)
@@ -44,7 +42,6 @@ impl Config {
     pub fn load() -> Result<Self, envy::Error> {
         let config = envy::from_env::<RawConfig>()?;
         let config = Config {
-            metrics_port: config.metrics_port,
             assets_service_url: config.assets_service_url,
             redis_hostname: config.redis_hostname,
             redis_port: config.redis_port,
@@ -62,8 +59,6 @@ impl Config {
 
 #[derive(Deserialize)]
 struct RawConfig {
-    #[serde(default = "default_metrics_port")]
-    metrics_port: u16,
     assets_service_url: String,
     redis_hostname: String,
     #[serde(default = "default_redis_port")]
@@ -76,10 +71,6 @@ struct RawConfig {
     redis_consumer_name: String,
     #[serde(default = "default_redis_batch_size")]
     redis_batch_size: u32,
-}
-
-fn default_metrics_port() -> u16 {
-    9090
 }
 
 fn default_redis_port() -> u16 {
