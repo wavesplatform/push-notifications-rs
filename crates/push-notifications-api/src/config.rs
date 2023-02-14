@@ -7,10 +7,6 @@ fn default_port() -> u16 {
     8080
 }
 
-fn default_metrics_port() -> u16 {
-    9090
-}
-
 fn default_pool_connection_timeout() -> u32 {
     5
 }
@@ -28,9 +24,6 @@ struct ConfigFlat {
     #[serde(default = "default_port")]
     port: u16,
 
-    #[serde(default = "default_metrics_port")]
-    metrics_port: u16,
-
     #[serde(default = "default_pool_connection_timeout")]
     pool_connection_timeout_sec: u32,
 
@@ -44,7 +37,6 @@ struct ConfigFlat {
 #[derive(Debug, Clone)]
 pub struct Config {
     pub port: u16,
-    pub metrics_port: u16,
     pub pool_connection_timeout: Duration,
     pub max_subscriptions_per_address_per_pair: u32,
     pub max_subscriptions_per_address_total: u32,
@@ -56,7 +48,6 @@ impl Config {
 
         Ok(Config {
             port: conf.port,
-            metrics_port: conf.metrics_port,
             pool_connection_timeout: Duration::from_secs(conf.pool_connection_timeout_sec as u64),
             max_subscriptions_per_address_per_pair: conf.max_subscriptions_per_address_per_pair,
             max_subscriptions_per_address_total: conf.max_subscriptions_per_address_total,

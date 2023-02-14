@@ -32,7 +32,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // Stats & liveness endpoints
     task::spawn(async move {
         MetricsWarpBuilder::new()
-            .with_metrics_port(config.metrics_port)
+            .with_metrics_port_from_env()
             //.with_readyz_checker(|| async move { init_finished_rx.await }) //TODO readyz
             .run_async()
     });
