@@ -2,8 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use diesel::{
-    dsl::sql_query, sql_types::Text, ExpressionMethods, JoinOnDsl, NullableExpressionMethods,
-    QueryDsl, Queryable,
+    dsl::sql_query, ExpressionMethods, JoinOnDsl, NullableExpressionMethods, QueryDsl, Queryable,
 };
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use itertools::{Either, Itertools};
@@ -338,8 +337,9 @@ impl Repo {
     ) -> Result<(), Error> {
         let address = address.as_base58_string();
 
+        // Safe from sql injections, because asset IDs are safe
         let conditions = topics
-            .into_iter()
+            .iter()
             .map(|t| match t {
                 Topic::OrderFulfilled => format!("(o.subscription_uid IS NOT NULL)"),
                 Topic::PriceThreshold(t) => {
@@ -353,6 +353,7 @@ impl Repo {
             })
             .join(" OR ");
 
+        // Safe from sql injections, because addresses are safe
         let query = format!(
             r#"
                 DELETE FROM subscriptions WHERE uid IN (
@@ -360,17 +361,22 @@ impl Repo {
                     FROM subscriptions s
                          LEFT OUTER JOIN topics_price_threshold p ON (p.subscription_uid = s.uid)
                          LEFT OUTER JOIN topics_order_execution o ON (o.subscription_uid = s.uid)
-                    WHERE (s.subscriber_address = '?') AND ({})
+                    WHERE (s.subscriber_address = '{}') AND ({})
                 )
             "#,
-            conditions
+            address, conditions
         );
 
-        let query = sql_query(query).bind::<Text, _>(&address);
+        let query = sql_query(query);
 
         let count = query.execute(conn).await?;
 
-        log::debug!("Deleted {} subscriptions for {}", count, address);
+        log::debug!(
+            "Deleted {} of {} requested subscriptions for {}",
+            count,
+            topics.len(),
+            address
+        );
 
         Ok(())
     }
