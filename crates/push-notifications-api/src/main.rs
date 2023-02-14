@@ -17,7 +17,7 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("Starting push-notifications api service with {:?}", config);
 
     log::info!("Connecting to postgres database: {:?}", pg_config);
-    let pool = db::async_pool(&pg_config).await?;
+    let pool = db::async_pool(&pg_config, config.pool_connection_timeout).await?;
 
     let devices = device::Repo {};
     let subscriptions = subscription::Repo {};

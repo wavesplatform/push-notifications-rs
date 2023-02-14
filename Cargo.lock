@@ -1690,6 +1690,7 @@ dependencies = [
  "database",
  "diesel",
  "diesel-async",
+ "envy",
  "lazy-regex",
  "model",
  "reqwest",

@@ -7,8 +7,7 @@ use model::{
 use std::collections::HashMap;
 
 use super::{
-    lokalise_gateway::{LokaliseConfig, RemoteGateway, LOCALISE_API_URL},
-    template::interpolate,
+    config::LokaliseConfig, lokalise_gateway::RemoteGateway, template::interpolate,
     translations::TranslationMap,
 };
 
@@ -30,7 +29,7 @@ pub struct Repo {
 
 impl Repo {
     pub async fn new(config: LokaliseConfig) -> Result<Self, Error> {
-        let remote_gateway = RemoteGateway::new(LOCALISE_API_URL, &config.token);
+        let remote_gateway = RemoteGateway::new(&config.api_url, &config.token);
         let keys = remote_gateway.keys_for_project(&config.project_id).await.map_err(Error::LocalizationApiError)?;
         let translations = TranslationMap::build(keys);
         if translations.is_complete() {

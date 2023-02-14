@@ -26,11 +26,6 @@ async fn main() -> Result<(), anyhow::Error> {
         config
     );
 
-    let lokalise_config = localization::LokaliseConfig {
-        token: config.lokalise_token,
-        project_id: config.lokalise_project_id,
-    };
-
     // Initialization
     //let (init_finished_tx, init_finished_rx) = oneshot::channel(); //TODO readyz
 
@@ -51,7 +46,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let subscriptions = subscription::Repo {};
     let assets = asset::RemoteGateway::new(config.assets_service_url);
     let devices = device::Repo {};
-    let localizer = task::spawn(localization::Repo::new(lokalise_config));
+    let localizer = task::spawn(localization::Repo::new(config.lokalise));
     let messages = message::Queue {};
 
     // Create event sources
