@@ -1,0 +1,12 @@
+[package]
+name = "model"
+version = "0.0.0"
+edition.workspace = true
+
+[dependencies]
+chrono.workspace = true
+serde.workspace = true
+waves-rust.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

@@ -2,6 +2,7 @@
 
 ## Environment variables
 
+
 ### Common
 
 | Env variable | Required | Default | Note                     |
@@ -15,16 +16,31 @@
 | PGUSER       | YES      |         | `WRITE`, `DELETE` access |
 | PGPASSWORD   | YES      |         |                          |
 
-### Processor
+
+### Processor (common)
+
+| Env variable        | Required | Default                       | Note                    |
+|---------------------|----------|-------------------------------|-------------------------|
+| LOKALISE_SDK_TOKEN  | YES      |                               | API token from lokalise |
+| LOKALISE_PROJECT_ID | YES      |                               | Project ID in lokalise  |
+| LOKALISE_API_URL    | NO       | https://api.lokalise.com/api2 | Lokalise API base URL   |
+
+
+### Processor (prices)
 
 | Env variable           | Required | Default | Note                                       |
 |------------------------| -------- | ------- |--------------------------------------------|
-| LOKALISE_SDK_TOKEN     | YES      |         | API token from lokalise                    |
 | ASSETS_SERVICE_URL     | YES      |         | Assets-service root url. No trailing slash |
 | DATA_SERVICE_URL       | YES      |         | Data-service root url. No trailing slash   |
 | BLOCKCHAIN_UPDATES_URL | YES      |         | Blockchain updates url                     |
 | MATCHER_ADDRESS        | YES      |         | Matcher address (base58)                   |
 | STARTING_HEIGHT        | NO       | None    | [Debug only] Blockchain height to start receiving notifications.<br/>If not set (or zero) uses current height from data  service. |
+
+
+### Processor (orders)
+
+| Env variable           | Required | Default | Note                                       |
+|------------------------| -------- | ------- |--------------------------------------------|
 | REDIS_HOSTNAME         | YES      |         | Redis instance hostname                    |
 | REDIS_PORT             | NO       | 6379    | Redis port                                 |
 | REDIS_USER             | NO       | default | Redis user, must have write permission     |
@@ -34,9 +50,15 @@
 | REDIS_CONSUMER_NAME    | YES      |         | E.g. 'push-notifications-0'                |
 | REDIS_BATCH_SIZE       | NO       | 100     | Number of stream items to query at once    |
 
+
 ### API
 
-Only [common](###Common)
+| Env variable                           | Required | Default | Note                                                        |
+|----------------------------------------| -------- |---------|-------------------------------------------------------------|
+| POOL_CONNECTION_TIMEOUT_SEC            | NO       | 5       | Database pool connection timeout, seconds                   |
+| MAX_SUBSCRIPTIONS_PER_ADDRESS_PER_PAIR | NO       | 10      | Maximum number of price subscriptions per pair, per address |
+| MAX_SUBSCRIPTIONS_PER_ADDRESS_TOTAL    | NO       | 50      | Maximum number of price subscriptions in total, per address |
+
 
 ### Sender
 

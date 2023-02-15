@@ -1,0 +1,22 @@
+[package]
+name = "push-notifications-sender"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+diesel.workspace = true
+envy.workspace = true
+fcm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+wavesexchange_log.workspace = true
+
+# Local deps
+database.workspace = true
+
+[[bin]]
+name = "sender"
+path = "src/main.rs"

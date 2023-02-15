@@ -1,52 +1,41 @@
-[package]
-name = "push-notifications-rs"
-version = "2.0.0"
+# push-notifications-rs
+
+[workspace]
+members = ["crates/*"]
+
+[workspace.package]
+version = "2.1.0"
 edition = "2021"
 
-[dependencies]
-anyhow = "1.0"
+[workspace.dependencies]
+# Local crates
+database = { path = "./crates/database", version = "0.0.0" }
+model = { path = "./crates/model", version = "0.0.0" }
+processing = { path = "./crates/processing", version = "0.0.0" }
+# Crates.io
+anyhow = "1"
 async-trait = "0.1"
-bb8 = "0.8"
+bb8 = { version = "0.8", default-features = false, features = [] }
 bigdecimal = "0.3"
 bs58 = "0.4"
-chrono = { version = "0.4", default-features = false, features = [] }
-diesel = { version = "2.0", default-features = false, features = ["chrono", "postgres", "serde_json", "without-deprecated"] }
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+diesel = { version = "2", default-features = false, features = ["chrono", "postgres", "serde_json", "without-deprecated"] }
 diesel-async = { version = "0.2", features = ["postgres", "bb8"] }
-diesel_migrations = "2.0"
+diesel_migrations = "2"
 envy = "0.4"
 fcm = "0.9" # uses chrono with default features, which transitively uses legacy 'time' crate with security issues
 itertools = "0.10"
 lazy-regex = { version = "2", default-features = false, features = ["std", "perf"] } # don't need Unicode support
 redis = { version = "0.22", default-features = false, features = ["aio", "tokio-comp", "streams"] }
 reqwest = { version = "0.11", features = ["json"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "1.0"
-tokio = { version = "1", features = ["rt-multi-thread"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }
 warp = "0.3"
-waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", tag = "rust_v1.4.3-1" }
 waves-rust = ">=0.2.3"
+waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", tag = "rust_v1.4.3-1" }
 wavesexchange_apis = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_apis/0.1.23" }
 wavesexchange_loaders = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_loaders/0.2.1" }
 wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
-wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.4" }
-
-[lib]
-name = "lib"
-path = "src/lib/lib.rs"
-
-[[bin]]
-name = "migration"
-path = "src/bin/migration.rs"
-
-[[bin]]
-name = "api"
-path = "src/bin/api.rs"
-
-[[bin]]
-name = "processor"
-path = "src/bin/processor.rs"
-
-[[bin]]
-name = "sender"
-path = "src/bin/sender.rs"
+wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.5" }
