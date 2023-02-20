@@ -197,7 +197,7 @@ impl MessagePump {
     }
 
     fn localize(&self, message: &Message, locale: &LocaleInfo) -> LocalizedMessage {
-        const FALLBACK_LANG: &str = "en-US";
+        const FALLBACK_LANG: &str = "en";
         let maybe_message = self.localizer.localize(message, locale);
         if let Some(message) = maybe_message {
             message
