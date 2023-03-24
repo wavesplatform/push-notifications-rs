@@ -1876,6 +1876,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "wavesexchange_log",
+ "wavesexchange_warp 0.14.5",
 ]
 
 [[package]]

@@ -8,13 +8,18 @@ mod config;
 use chrono::{DateTime, Utc};
 use diesel::{prelude::*, Connection, PgConnection};
 use std::fmt;
+use tokio::task;
+use wavesexchange_warp::MetricsWarpBuilder;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Configs
     let pg_config = database::config::Config::load()?;
     let config = config::Config::load()?;
-    log::info!("Starting push-notifications sender service with {:?}", config);
+    log::info!(
+        "Starting push-notifications sender service with {:?}",
+        config
+    );
 
     log::info!("Connecting to postgres database: {:?}", pg_config);
     let mut conn = PgConnection::establish(&pg_config.database_url())?;
@@ -25,6 +30,13 @@ async fn main() -> anyhow::Result<()> {
         click_action: config.click_action,
         dry_run: config.dry_run,
     };
+
+    // Stats & liveness endpoints
+    task::spawn(
+        MetricsWarpBuilder::new()
+            .with_metrics_port_from_env()
+            .run_async(),
+    );
 
     loop {
         let message_to_send = postgres::dequeue(&mut conn, config.send_max_attempts as i16)?;
