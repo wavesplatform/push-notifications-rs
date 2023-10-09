@@ -1,4 +1,4 @@
-FROM rust:1.67 AS builder
+FROM rust:1.73 AS builder
 WORKDIR /app
 
 RUN rustup component add rustfmt
@@ -16,7 +16,7 @@ RUN cargo install -j$(nproc) --path ./crates/push-notifications-processor-prices
 RUN cargo install -j$(nproc) --path ./crates/push-notifications-sender
 
 
-FROM debian:11 as runtime
+FROM debian:12 as runtime
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y curl openssl libssl-dev libpq-dev
