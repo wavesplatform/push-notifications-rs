@@ -222,7 +222,10 @@ mod redis_stream {
         log::info!("Querying Redis stream '{}'...", stream_name);
         let reply = con.xinfo_stream(&stream_name).await;
         if reply.is_err() {
-            log::error!("Stream not found: '{}'\nPlease create the corresponding stream in Redis and rerun this service.", stream_name);
+            log::error!(
+                "Stream not found: '{}'\nPlease create the corresponding stream in Redis and rerun this service.",
+                stream_name
+            );
         }
         log::info!("Stream info: {}", stream_info(reply?));
 

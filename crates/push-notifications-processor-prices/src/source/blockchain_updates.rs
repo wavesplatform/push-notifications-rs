@@ -5,8 +5,7 @@ use tokio::{sync::mpsc, task};
 use waves_protobuf_schemas::{
     tonic,
     waves::events::grpc::{
-        blockchain_updates_api_client::BlockchainUpdatesApiClient, SubscribeEvent,
-        SubscribeRequest,
+        blockchain_updates_api_client::BlockchainUpdatesApiClient, SubscribeEvent, SubscribeRequest,
     },
 };
 
@@ -54,9 +53,7 @@ pub(super) struct TxExchange {
 }
 
 #[derive(Clone)]
-pub(super) struct BlockchainUpdatesClient(
-    BlockchainUpdatesApiClient<tonic::transport::Channel>,
-);
+pub(super) struct BlockchainUpdatesClient(BlockchainUpdatesApiClient<tonic::transport::Channel>);
 
 impl BlockchainUpdatesClient {
     pub(super) async fn connect(blockchain_updates_url: String) -> Result<Self, anyhow::Error> {
@@ -159,11 +156,14 @@ mod convert {
                     ..
                 } = append;
 
-                let is_microblock = extract_is_microblock(&body)
-                    .ok_or(ConvertError("failed to extract is_microblock"))?;
+                let is_microblock = {
+                    extract_is_microblock(&body)
+                        .ok_or(ConvertError("failed to extract is_microblock"))?
+                };
 
-                let id = extract_id(&body, &src.id)
-                    .ok_or(ConvertError("failed to extract block id"))?;
+                let id = {
+                    extract_id(&body, &src.id).ok_or(ConvertError("failed to extract block id"))?
+                };
                 let id = base58(id);
 
                 // Only full blocks have timestamp, microblocks doesn't.

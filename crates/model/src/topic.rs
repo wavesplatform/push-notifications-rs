@@ -23,7 +23,8 @@ pub struct PriceThreshold {
 
 impl Eq for PriceThreshold {} // Ignore the fact that Topic can contain `f64`
 
-impl Hash for PriceThreshold { // Has to impl Hash manually because of `f64` inside
+// Has to impl Hash manually because of `f64` inside
+impl Hash for PriceThreshold {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.amount_asset.hash(state);
         self.price_asset.hash(state);

@@ -14,7 +14,10 @@ async fn main() -> anyhow::Result<()> {
     // Configs
     let pg_config = database::config::Config::load()?;
     let config = config::Config::load()?;
-    log::info!("Starting push-notifications sender service with {:?}", config);
+    log::info!(
+        "Starting push-notifications sender service with {:?}",
+        config
+    );
 
     log::info!("Connecting to postgres database: {:?}", pg_config);
     let mut conn = PgConnection::establish(&pg_config.database_url())?;

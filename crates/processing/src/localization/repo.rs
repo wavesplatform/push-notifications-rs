@@ -30,7 +30,10 @@ pub struct Repo {
 impl Repo {
     pub async fn new(config: LokaliseConfig) -> Result<Self, Error> {
         let remote_gateway = RemoteGateway::new(&config.api_url, &config.token);
-        let keys = remote_gateway.keys_for_project(&config.project_id).await.map_err(Error::LocalizationApiError)?;
+        let keys = remote_gateway
+            .keys_for_project(&config.project_id)
+            .await
+            .map_err(Error::LocalizationApiError)?;
         let translations = TranslationMap::build(keys);
         if translations.is_complete() {
             log::trace!("Lokalise translations: {:?}", translations);

@@ -27,14 +27,7 @@ async fn main() -> Result<(), anyhow::Error> {
         max_subscriptions_per_address_total: config.max_subscriptions_per_address_total,
     };
 
-    api::start(
-        config.port,
-        devices,
-        subscriptions,
-        subscribe_config,
-        pool,
-    )
-    .await;
+    api::start(config.port, devices, subscriptions, subscribe_config, pool).await;
 
     Ok(())
 }

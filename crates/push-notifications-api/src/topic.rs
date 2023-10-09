@@ -149,10 +149,7 @@ mod tests {
                 "push://price_threshold/8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc/WAVES/500.0",
                 (
                     Topic::PriceThreshold(PriceThreshold {
-                        amount_asset: Asset::from_id(
-                            "8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc",
-                        )
-                            .unwrap(),
+                        amount_asset: Asset::from_id("8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc").unwrap(),
                         price_asset: Asset::Waves,
                         price_threshold: 500.0,
                     }),
@@ -164,10 +161,7 @@ mod tests {
                 (
                     Topic::PriceThreshold(PriceThreshold {
                         amount_asset: Asset::Waves,
-                        price_asset: Asset::from_id(
-                            "8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc",
-                        )
-                            .unwrap(),
+                        price_asset: Asset::from_id("8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc").unwrap(),
                         price_threshold: 500.0,
                     }),
                     SubscriptionMode::Once,
@@ -223,8 +217,7 @@ mod tests {
             (
                 Topic::PriceThreshold(PriceThreshold {
                     amount_asset: Asset::Waves,
-                    price_asset: Asset::from_id("8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc")
-                        .unwrap(),
+                    price_asset: Asset::from_id("8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc").unwrap(),
                     price_threshold: 1.7,
                 }),
                 SubscriptionMode::Repeat,
@@ -232,8 +225,7 @@ mod tests {
             ),
             (
                 Topic::PriceThreshold(PriceThreshold {
-                    amount_asset: Asset::from_id("8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc")
-                        .unwrap(),
+                    amount_asset: Asset::from_id("8cwrggsqQREpCLkPwZcD2xMwChi1MLaP7rofenGZ5Xuc").unwrap(),
                     price_asset: Asset::Waves,
                     price_threshold: 2.,
                 }),
@@ -243,7 +235,7 @@ mod tests {
             (
                 Topic::OrderFulfilled,
                 SubscriptionMode::Once,
-                "push://orders?oneshot"
+                "push://orders?oneshot",
             ),
             (
                 Topic::OrderFulfilled,

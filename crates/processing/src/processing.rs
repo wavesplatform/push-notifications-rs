@@ -1,4 +1,4 @@
-use crate::{asset, localization, error::Error};
+use crate::{asset, error::Error, localization};
 use database::{device, message, subscription};
 use diesel_async::{AsyncConnection, AsyncPgConnection};
 use model::{
@@ -191,7 +191,11 @@ impl MessagePump {
     }
 
     async fn asset_ticker(&self, asset: &Asset) -> Result<String, Error> {
-        let maybe_ticker = self.assets.ticker(asset).await.map_err(Error::AssetsApiError)?;
+        let maybe_ticker = self
+            .assets
+            .ticker(asset)
+            .await
+            .map_err(Error::AssetsApiError)?;
         let ticker = maybe_ticker.unwrap_or_else(|| asset.id());
         Ok(ticker)
     }

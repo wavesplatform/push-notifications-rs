@@ -1,7 +1,7 @@
+use database::config::Config;
 use diesel::migration::Migration;
 use diesel::{migration, pg::PgConnection, Connection};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use database::config::Config;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
