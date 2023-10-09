@@ -24,7 +24,7 @@ use crate::{
 pub struct Subscription {
     pub uid: i32,
     pub subscriber: Address,
-    pub created_at: DateTime<Utc>,
+    //pub created_at: DateTime<Utc>, // not used yet
     pub mode: SubscriptionMode,
     pub topic: Topic,
 }
@@ -88,11 +88,11 @@ impl Repo {
             .await?;
 
         rows.into_iter()
-            .map(|(uid, created_at, topic_type)| {
+            .map(|(uid, _created_at, topic_type)| {
                 Ok(Subscription {
                     uid,
                     subscriber: address.to_owned(),
-                    created_at,
+                    //created_at, // not used yet
                     mode: topic_type_from_int(topic_type)?,
                     topic: Topic::OrderFulfilled,
                 })
@@ -132,13 +132,13 @@ impl Repo {
                 // there can be extra rows that we need to filter properly.
                 price_range.contains(threshold)
             })
-            .map(|(uid, address, created_at, topic_type, price_threshold)| {
+            .map(|(uid, address, _created_at, topic_type, price_threshold)| {
                 let address =
                     Address::from_string(&address).map_err(|_| Error::BadAddress(address))?;
                 Ok(Subscription {
                     uid,
                     subscriber: address,
-                    created_at,
+                    //created_at, // not used yet
                     mode: topic_type_from_int(topic_type)?,
                     topic: Topic::PriceThreshold(PriceThreshold {
                         amount_asset: asset_pair.amount_asset.clone(),
