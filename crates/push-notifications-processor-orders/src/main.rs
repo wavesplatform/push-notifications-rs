@@ -8,7 +8,10 @@ mod source;
 use std::sync::Arc;
 
 use diesel_async::{AsyncConnection, AsyncPgConnection};
-use tokio::{sync::mpsc, task, try_join};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task, try_join,
+};
 
 use wavesexchange_warp::MetricsWarpBuilder;
 
@@ -27,13 +30,13 @@ async fn main() -> Result<(), anyhow::Error> {
     );
 
     // Initialization
-    //let (init_finished_tx, init_finished_rx) = oneshot::channel(); //TODO readyz
+    let (init_finished_tx, init_finished_rx) = oneshot::channel();
 
     // Stats & liveness endpoints
     task::spawn(async move {
         MetricsWarpBuilder::new()
             .with_metrics_port_from_env()
-            //.with_readyz_checker(|| async move { init_finished_rx.await }) //TODO readyz
+            .with_init_channel(init_finished_rx)
             .run_async()
     });
 
@@ -86,7 +89,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let h_processor = task::spawn(async { processor.run_event_loop(events_rx, conn).await });
 
     // Initialization phase finished
-    //let () = init_finished_tx.send(()).expect("init"); //TODO readyz
+    init_finished_tx.send(()).expect("init");
 
     // Join all the background tasks
     let ((), r_orders_source) = try_join!(h_processor, h_orders_source)?;
