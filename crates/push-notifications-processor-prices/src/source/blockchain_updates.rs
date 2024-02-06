@@ -57,7 +57,10 @@ pub(super) struct BlockchainUpdatesClient(BlockchainUpdatesApiClient<tonic::tran
 
 impl BlockchainUpdatesClient {
     pub(super) async fn connect(blockchain_updates_url: String) -> Result<Self, anyhow::Error> {
-        let grpc_client = BlockchainUpdatesApiClient::connect(blockchain_updates_url).await?;
+        const MAX_MSG_SIZE: usize = 8 * 1024 * 1024; // 8 MB instead of the default 4 MB
+        let grpc_client = BlockchainUpdatesApiClient::connect(blockchain_updates_url)
+            .await?
+            .max_decoding_message_size(MAX_MSG_SIZE);
         Ok(BlockchainUpdatesClient(grpc_client))
     }
 
