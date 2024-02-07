@@ -9,7 +9,7 @@ pub enum Asset {
 }
 
 impl Asset {
-    pub const WAVES_ASSET_ID: &str = "WAVES";
+    pub const WAVES_ASSET_ID: &'static str = "WAVES";
 
     pub fn from_id(id: &str) -> Result<Self, ()> {
         if id == Self::WAVES_ASSET_ID {
