@@ -19,7 +19,7 @@ RUN cargo build -j$(nproc) --workspace --release
 FROM debian:12 as runtime
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y curl openssl libssl-dev libpq-dev
+RUN apt-get update && apt-get install -y curl openssl libssl-dev libpq-dev postgresql-client
 RUN /usr/sbin/update-ca-certificates
 
 COPY --from=builder /app/target/release/api .
